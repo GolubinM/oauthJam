@@ -1,0 +1,22 @@
+# Игнорировать зависимости npm
+node_modules/
+.npm
+package-lock.json
+
+# Игнорировать скомпилированные файлы (если TypeScript)
+**/*.js
+**/*.js.map
+**/*.d.ts
+
+# Игнорировать настройки IDE
+.vscode/
+.idea/
+
+# Игнорировать временные файлы и логи
+*.log
+*.tmp
+.DS_Store (Mac)
+Thumbs.db (Windows)
+
+# Игнорировать локальные настройки clasp
+.clasprc.json

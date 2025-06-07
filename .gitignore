@@ -4,9 +4,9 @@ node_modules/
 package-lock.json
 
 # Игнорировать скомпилированные файлы (если TypeScript)
-**/*.js
-**/*.js.map
-**/*.d.ts
+# **/*.js
+# **/*.js.map
+# **/*.d.ts
 
 # Игнорировать настройки IDE
 .vscode/

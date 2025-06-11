@@ -4,7 +4,6 @@ function doGet(e) {
     else { res = "unknown Apps command" }
     return ContentService.createTextOutput(res)
 }
-
 function doPost(e) {
     const params = e.parameter;
     const isAllowed = checkAllowed()
@@ -16,7 +15,6 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON)
     // return ContentService.createTextOutput(res.msg);
 }
-
 /**
  * @return txt - finish message for Content Service
  */
@@ -58,9 +56,6 @@ function getApps(params) {
     }
     return res
 }
-
-
-
 function checkAllowed() {
     const allaowedSSId = '1eeld1vH9Mp_iyzx59m3m58pD5NttR-4j6cxvDANh2AE'
     const userEmail = Session.getActiveUser().getEmail();
@@ -69,8 +64,6 @@ function checkAllowed() {
     if (foundIdex !== -1) { return true }
     return false
 }
-
-
 // function doGet(e) {
 //     // Узнаём, кто обратился
 //     const isAllowed = checkAllowed()

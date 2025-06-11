@@ -3,8 +3,6 @@ function doGet_0(e) {
     return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
 }
-
-
 function doGet_3(e) {
     try {
         if (e) {
@@ -17,7 +15,6 @@ function doGet_3(e) {
     }
     return ContentService.createTextOutput(rez);
 }
-
 function doGet_2(e) {
     var output = "Hello from Web App!"; // Ваш текст
     return ContentService.createTextOutput(output).setMimeType(ContentService.MimeType.TEXT);

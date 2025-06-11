@@ -1,9 +1,0 @@
-{
-  "compilerOptions": {
-    "lib": ["esnext"],
-    "target": "es2019",
-    "module": "commonjs",
-    "strict": true,
-    "skipLibCheck": true
-  }
-}

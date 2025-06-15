@@ -11,7 +11,6 @@ var SS,
     searchTextsJam: "searchText",
     advHistory: "История затрат(api)",
   };
-
 function getProducts() {
   SS = SpreadsheetApp.openById(SSId);
   let arrProducts = [],
@@ -59,7 +58,7 @@ function getProducts() {
   let msg = `Загружено новых товаров: ${arrProducts.length}`;
   try {
     inform(SS, [msg, `${SheetNames.products}`]);
-  } catch (e) {}
+  } catch (e) { }
   //   return { msg, propValue: null, setTriggFlag: false };
 
   function getRequestOptions(cursorNext = "") {
@@ -197,7 +196,7 @@ function getAdvStatistic() {
   msg += "Триггер statKeyWordsTrigg установлен и сработает через 5 мин.";
   try {
     inform(SS, [msg, SheetNames.advStat]);
-  } catch (e) {}
+  } catch (e) { }
 
   //   return { msg, propValue: null, setTriggFlag: false };
 
@@ -376,7 +375,7 @@ function getAdvCampList() {
   let ss = SS.getSheetByName(SheetNames.advList);
   try {
     ss.getFilter().remove();
-  } catch (ex) {}
+  } catch (ex) { }
   let url = "https://advert-api.wildberries.ru/adv/v1/promotion/count";
   let options = {
     method: "get",
@@ -418,7 +417,7 @@ function getAdvCampList() {
   inform(SS, [msg, "Обновление списка РК"]);
   try {
     inform(SS, [msg, `${SheetNames.advList}`]);
-  } catch (e) {}
+  } catch (e) { }
 
   //   return { msg, propValue: null, setTriggFlag: false };
 
@@ -578,7 +577,7 @@ function statKeyWords(SP) {
   parseAndSaveResp(successRes, isFinish);
   try {
     inform(SS, [msg, "statKeyWords"]);
-  } catch (e) {}
+  } catch (e) { }
   console.log("campsStatKeyWords FINISHED");
 
   // парсинг и запись
@@ -688,6 +687,7 @@ function analyticNmIdPeriod(SP) {
     dateToSer -= stepDays;
   }
   let attempt,
+    propValue,
     maxAttempt = 3,
     gapTime = 21e3,
     table = [],
@@ -711,8 +711,7 @@ function analyticNmIdPeriod(SP) {
       };
     });
     console.log(`Всего запросов:${requests.length}. Максимум запросов за 5 мин: 15.`);
-    const SP = PropertiesService.getScriptProperties();
-    let propValue = +(SP.getProperty("analyticNmIdPeriod") || 0);
+    propValue = +(SP.getProperty("analyticNmIdPeriod") || 0);
     if (propValue) {
       console.log(`Сбор данных будет продолжен с запроса:${propValue * maxRequests}`);
     } else {
@@ -757,8 +756,9 @@ function analyticNmIdPeriod(SP) {
     msg = `Возможно период для запроса задан не корректно.`;
   }
   propValue++;
-  let finisedRequestsCount = propValue * maxRequests;
-  let setTriggFlag = finisedRequestsCount < totalRequstCount ? true : false;
+  let finishedRequestsCount = propValue * maxRequests;
+  let setTriggFlag = finishedRequestsCount < totalRequstCount ? true : false;
+  
   if (setTriggFlag) {
     console.log("Устанавливаем триггер на следующий запуск скрипта через 1 минуту. Сбор со страницы:", propValue);
     SP.setProperty("analyticNmIdPeriod", propValue);
@@ -768,7 +768,6 @@ function analyticNmIdPeriod(SP) {
   }
   console.log(msg);
   console.log("analyticNmIdPeriod FINISHED");
-  // return { msg, propValue, setTriggFlag };
 
   // запрос на WB
   function getWbResponses(request, idReq) {
@@ -1241,7 +1240,8 @@ function analyticsJam(reportType = "DETAIL_HISTORY_REPORT") {
     return fixedTable;
   }
 }
-function searchTextsJam(propValue) {
+function searchTextsJam(SP) {
+  removeTriggers(["searchTextsJamTrigg"]);
   let { dateFromSer, dateToSer } = getHeaderDateParams(SheetNames.searchTextsJam);
   const maxRequests = 10;
   // const maxRequests = 4; // DEBUG
@@ -1288,7 +1288,8 @@ function searchTextsJam(propValue) {
   // console.log(JSON.stringify(dates, null, 2));
   // return { msg: "DEBUG searchTextsJam", propValue: null, setTriggFlag: false }
 
-  propValue = propValue || 0;
+  // const SP = PropertiesService.getScriptProperties();
+  let propValue = +(SP.getProperty("searchTextsJam") || 0);
 
   let attempt,
     maxAttempt = 3,
@@ -1325,12 +1326,6 @@ function searchTextsJam(propValue) {
     }
     requests = requests.slice(propValue * maxRequests, (propValue + 1) * maxRequests);
     console.log(`Отобрано запросов:${requests.length}. Максимум запросов за 5 мин: 15.`);
-
-    // console.log(JSON.stringify(requests, null, 2));
-    // return { msg: "DEBUG searchTextsJam", propValue: null, setTriggFlag: false }
-
-    // requests = requests.slice(0, 15) // усеньшено до 7, т.к. происходят повторные запуски приложения через 2 минуты
-    // requests = requests.slice(0, 7)
 
     for (let request of requests) {
       console.log(`Before request: xRatelimitRemaining && waitFor:${xRatelimitRemaining}, ${waitFor}`);
@@ -1370,12 +1365,21 @@ function searchTextsJam(propValue) {
     msg = `Возможно период для запроса задан не корректно.`;
   }
   propValue++;
-  let finisedRequestsCount = propValue * maxRequests;
-  let setTriggFlag = finisedRequestsCount < totalRequstCount ? true : false;
+  let finishedRequestsCount = propValue * maxRequests;
+  let setTriggFlag = finishedRequestsCount < totalRequstCount ? true : false;
+  
+  if (setTriggFlag) {
+    console.log("Устанавливаем триггер на следующий запуск скрипта через 1 минуту. Сбор со страницы:", propValue);
+    SP.setProperty("searchTextsJam", propValue);
+    ScriptApp.newTrigger("searchTextsJamTrigg").timeBased().after(6e4).create();
+  } else {
+    SP.deleteProperty("searchTextsJam");
+  }
+
   console.log("propValue:", propValue, "setTriggFlag:", setTriggFlag);
   console.log(msg);
-  console.log("analyticNmIdPeriod FINISHED");
-  return { msg, propValue, setTriggFlag };
+  console.log("searchTextsJam FINISHED");
+  // return { msg, propValue, setTriggFlag };
 
   // запрос на WB
   function getWbResponses(request, idReq) {
@@ -1476,7 +1480,8 @@ function searchTextsJam(propValue) {
     return msg;
   }
 }
-function searchReportGroupJam(propValue) {
+function searchReportGroupJam(SP) {
+  removeTriggers(["searchReportGroupJamTrigg"]);
   let { dateFromSer, dateToSer } = getHeaderDateParams(searchTextsJam);
   const maxRequests = 10;
   // const maxRequests = 4; // DEBUG
@@ -1519,11 +1524,8 @@ function searchReportGroupJam(propValue) {
     }
     dateFromSer++;
   }
-
-  // console.log(JSON.stringify(dates, null, 2));
-  // return { msg: "DEBUG searchTextsJam", propValue: null, setTriggFlag: false }
-
-  propValue = propValue || 0;
+ 
+  let propValue = +(SP.getProperty("searchReportGroupJam") || 0);
 
   let attempt,
     maxAttempt = 3,
@@ -1560,10 +1562,7 @@ function searchReportGroupJam(propValue) {
     }
     requests = requests.slice(propValue * maxRequests, (propValue + 1) * maxRequests);
     console.log(`Отобрано запросов:${requests.length}. Максимум запросов за 5 мин: 15.`);
-
-    // console.log(JSON.stringify(requests, null, 2));
-    // return { msg: "DEBUG searchTextsJam", propValue: null, setTriggFlag: false }
-
+   
     // requests = requests.slice(0, 15) // усеньшено до 7, т.к. происходят повторные запуски приложения через 2 минуты
     // requests = requests.slice(0, 7)
 
@@ -1606,10 +1605,15 @@ function searchReportGroupJam(propValue) {
   propValue++;
   let finisedRequestsCount = propValue * maxRequests;
   let setTriggFlag = finisedRequestsCount < totalRequstCount ? true : false;
-  console.log("propValue:", propValue, "setTriggFlag:", setTriggFlag);
+  if (setTriggFlag) {
+    console.log("Устанавливаем триггер на следующий запуск скрипта через 1 минуту. Сбор со страницы:", propValue);
+    SP.setProperty("searchReportGroupJam", propValue);
+    ScriptApp.newTrigger("searchReportGroupJamTrigg").timeBased().after(6e4).create();
+  } else {
+    SP.deleteProperty("searchReportGroupJam");
+  }
   console.log(msg);
-  console.log("analyticNmIdPeriod FINISHED");
-  return { msg, propValue, setTriggFlag };
+  console.log("searchReportGroupJam FINISHED");
 
   // запрос на WB
   function getWbResponses(request, idReq) {

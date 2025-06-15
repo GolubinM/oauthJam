@@ -30,10 +30,7 @@ function getProducts() {
     arrCards = [],
     responsePage = 1;
   while (responsePage < 200) {
-    response = UrlFetchApp.fetch(
-      `https://content-api.wildberries.ru/content/v2/get/cards/list?`,
-      options
-    );
+    response = UrlFetchApp.fetch(`https://content-api.wildberries.ru/content/v2/get/cards/list?`, options);
     SysUtils / SysUtils.checkResponseCode(response.getResponseCode());
     arrCardsObj = JSON.parse(response.getContentText());
     arrCards = arrCards.concat(arrCardsObj?.["cards"]);
@@ -100,30 +97,17 @@ function getAdvStatistic() {
   let msg = "";
   let { dateFromSer, dateToSer } = getHeaderDateParams(SheetNames.advStat);
   if (dateToSer - dateFromSer > 31) {
-    console.log(`Возможный интервал получения статистики 31 суток`);
+    msg = `Возможный интервал получения статистики 31 суток`;
+    inform(SS, [msg, SheetNames.advStat]);
     dateFromSer = dateToSer - 31;
   }
-  //   let days = dateToSer - dateFromSer;
-  let dateFromStr = DateUtils.getStrDateFromSerialNumberDate(dateFromSer); // yyyy-MM-dd
+  let dateFromStr = DateUtils.getStrDateFromSerialNumberDate(dateFromSer);
   let dateToStr = DateUtils.getStrDateFromSerialNumberDate(dateToSer);
 
-  console.log(
-    `Обновляем дней: ${
-      dateToSer - dateFromSer
-    }, с: ${dateFromStr} по: ${dateToStr}`
-  );
+  console.log(`Обновляем дней: ${dateToSer - dateFromSer}, с: ${dateFromStr} по: ${dateToStr}`);
   let Authorization = getkey("rekl");
-  // токен и даты с и по конец блока ---------------
-  // берем список кампаний и даты начала/конца компании
-  // repairNumber -  определяет откуда берем номера кампаний 'Список Кампаний(api)'|| 'serv' (отдельно обновить избранное)
-
-  let campIds = ApiUtils.readRangeSS(
-    SSId,
-    `${SheetNames.advList}!A2:D`,
-    "UNFORMATTED_VALUE",
-    "SERIAL_NUMBER"
-  );
-  // Выбрасываем кампании у которых status !== 9 || status !== 11 || дата изменения не позже даты запроса
+  let campIds = ApiUtils.readRangeSS(SSId, `${SheetNames.advList}!A2:D`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
+  // Исключаем кампании у которых status !== 9 || status !== 11 || дата изменения не позже даты запроса
   let objAdvNumberType = {}; // сбор типа кампний
   campIds = campIds.reduce((res, row) => {
     if (row[2] == 9 || row[2] == 11 || row[3] >= dateFromSer) {
@@ -170,12 +154,7 @@ function getAdvStatistic() {
     return request;
   });
 
-  console.info(
-    "requests.length is:",
-    requests.length,
-    " id per request:",
-    long
-  );
+  console.info("requests.length is:", requests.length, " id per request:", long);
 
   let attempt = 0,
     maxAttempt = 3,
@@ -198,11 +177,7 @@ function getAdvStatistic() {
         break;
       }
       waitFor = xRatelimitRetry ? xRatelimitRetry * 1000 : gapTime;
-      console.log(
-        `Запрос с кодом!=200: ${idReq} на попытке: ${attempt} повторный запрос через: ${
-          waitFor / 1000
-        }`
-      );
+      console.log(`Запрос с кодом!=200: ${idReq} на попытке: ${attempt} повторный запрос через: ${waitFor / 1000}`);
       attempt++;
       if (!xRatelimitRemaining && waitFor > 0) {
         Utilities.sleep(waitFor);
@@ -215,9 +190,13 @@ function getAdvStatistic() {
   // вызов функции обработки и сохранения данных
   parseAndSaveResp(successRes);
   console.log(msg);
-  msg += " Сбор полей [clicks,sum,views] будет произведен через 1 мин.";
+
+  let triggerInterval = 1 * 6e4;
+  removeTriggers(["statKeyWordsTrigg"]);
+  ScriptApp.newTrigger("statKeyWordsTrigg").timeBased().after(triggerInterval).create();
+  msg += "Триггер statKeyWordsTrigg установлен и сработает через 5 мин.";
   try {
-    inform(SS, [msg, `${SheetNames.advStat}`]);
+    inform(SS, [msg, SheetNames.advStat]);
   } catch (e) {}
 
   //   return { msg, propValue: null, setTriggFlag: false };
@@ -240,10 +219,7 @@ function getAdvStatistic() {
     }
     if (respCode === 429) {
       xRatelimitRetry = headers["x-ratelimit-retry"];
-      console.log(
-        respCode,
-        `Превышено количество запросов в минуту, запрос #${idReq}, XRatelimitRetry: ${xRatelimitRetry}`
-      );
+      console.log(respCode, `Превышено количество запросов в минуту, запрос #${idReq}, XRatelimitRetry: ${xRatelimitRetry}`);
     } else if (respCode === 200) {
       successRes.push(response.getContentText());
       return true;
@@ -262,15 +238,9 @@ function getAdvStatistic() {
             for (let ap of day?.apps) {
               if (ap?.appType) {
                 for (let id of ap?.nm) {
-                  Logger.log(
-                    "nmId: %s : %s",
-                    id?.nmId,
-                    objAdvNumberType[`${id.nmId}`]
-                  );
+                  Logger.log("nmId: %s : %s", id?.nmId, objAdvNumberType[`${id.nmId}`]);
                   out.push([
-                    Math.floor(
-                      DateUtils.getSerialNumberDate(new Date(day?.date))
-                    ) || "",
+                    Math.floor(DateUtils.getSerialNumberDate(new Date(day?.date))) || "",
                     pload?.advertId || "",
                     id?.nmId || "",
                     +id?.sum || "",
@@ -301,15 +271,9 @@ function getAdvStatistic() {
     }, []);
     if (table.length) {
       console.log("Ответ получен. Парсим.");
-      table = SheetUtils.group_list(
-        table,
-        [0, 1, 2, 16],
-        [3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-      );
+      table = SheetUtils.group_list(table, [0, 1, 2, 16], [3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
       table = getHystorySpentForAdv(table); // расчет сумм затрат из Истории
-      const rowUpdateFrom =
-        DateUtils.findRowAfterDate(dateFromSer, `${SheetNames.advStat}!A5:A`) +
-        5;
+      const rowUpdateFrom = DateUtils.findRowAfterDate(dateFromSer, `${SheetNames.advStat}!A5:A`) + 5;
       table.sort((a, b) => a[0] - b[0]);
       tableLength = table.length;
       const lastRow = SS.getSheetByName(SheetNames.advStat).getLastRow();
@@ -317,15 +281,9 @@ function getAdvStatistic() {
       if (addRows > 0) {
         table = SheetUtils.clearByAddBlankRow(table, addRows);
       }
-      let res = ApiUtils.writeToSS(
-        SSId,
-        table,
-        `${SheetNames.advStat}!A${rowUpdateFrom}`
-      );
+      let res = ApiUtils.writeToSS(SSId, table, `${SheetNames.advStat}!A${rowUpdateFrom}`);
       if (res) {
-        msg +=
-          "Обновление статистики рекламных кампаний завершено. Обновлено строк: " +
-          tableLength;
+        msg += "Обновление статистики рекламных кампаний завершено. Обновлено строк: " + tableLength;
       }
     } else {
       msg += "Данные для обновления не были получены.";
@@ -339,12 +297,7 @@ function getHystorySpentForAdv(table) {
     res[key].total += row[3];
     return res;
   }, {});
-  let dataHistory = ApiUtils.readRangeSS(
-    SSId,
-    `${SheetNames.advHistory}!A5:C`,
-    "UNFORMATTED_VALUE",
-    "SERIAL_NUMBER"
-  );
+  let dataHistory = ApiUtils.readRangeSS(SSId, `${SheetNames.advHistory}!A5:C`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
   let objHistoryTtl = dataHistory.reduce((res, row) => {
     let key = `${row[0]}~${row[1]}`;
     res[key] = res[key] || { total: 0 };
@@ -358,12 +311,6 @@ function getHystorySpentForAdv(table) {
     table[i].push(sum);
   }
   return table;
-}
-function testHistory() {
-  SSId = "1fVwPRevZnLnJWWMhIVNMB5j0jAidEDrueVn9khsAWwY";
-  SS = SpreadsheetApp.openById(SSId);
-  SpreadsheetApp.setActiveSpreadsheet(SS);
-  updateHistory();
 }
 function updateHistory() {
   let { dateFromSer, dateToSer } = getHeaderDateParams(SheetNames.advHistory);
@@ -381,25 +328,15 @@ function updateHistory() {
       data = data.concat(new_data);
     }
   });
-  data.sort((a, b) =>
-    DateUtils.reversDateStToSort(a[0]).localeCompare(
-      DateUtils.reversDateStToSort(b[0])
-    )
-  );
-  let rowToWrite =
-    DateUtils.findRowAfterDate(dateFromSer, `${SheetNames.advHistory}!A5:A`) +
-    5;
+  data.sort((a, b) => DateUtils.reversDateStToSort(a[0]).localeCompare(DateUtils.reversDateStToSort(b[0])));
+  let rowToWrite = DateUtils.findRowAfterDate(dateFromSer, `${SheetNames.advHistory}!A5:A`) + 5;
   lastRow = SS.getSheetByName(SheetNames.advHistory).getLastRow();
   let addClearRows = lastRow - (rowToWrite + data.length - 1);
   if (addClearRows > 0) {
     data = SheetUtils.clearByAddBlankRow(data, addClearRows);
   }
   ApiUtils.writeToSS(SSId, data, `${SheetNames.advHistory}!A${rowToWrite}`);
-  let msg =
-    "Обновление истории затрат завершено. Записано строк: " +
-    data.length +
-    " Строки обновлены со строки: " +
-    rowToWrite;
+  let msg = "Обновление истории затрат завершено. Записано строк: " + data.length + " Строки обновлены со строки: " + rowToWrite;
   console.log(msg);
   return { msg, propValue: null, setTriggFlag: false };
   function getCampHistory(startDate, endDate) {
@@ -416,14 +353,9 @@ function updateHistory() {
       Utilities.sleep(1000);
       data = JSON.parse(data);
       data = data.reduce((res, d) => {
-        if (
-          d.updTime.slice(0, 10) > startDate &&
-          d.updTime.slice(0, 10) <= endDate
-        ) {
+        if (d.updTime.slice(0, 10) > startDate && d.updTime.slice(0, 10) <= endDate) {
           res.push([
-            d.updTime
-              ? DateUtils.formatDateTo_dd_MM_yyyy(d.updTime)
-              : "01.01.2100",
+            d.updTime ? DateUtils.formatDateTo_dd_MM_yyyy(d.updTime) : "01.01.2100",
             d["advertId"] || "",
             d["updSum"] || "",
             d["advertType"] || "",
@@ -461,12 +393,7 @@ function getAdvCampList() {
       data = JSON.parse(data);
       let header = ["advertId", "type", "status", "changeTime"];
       let newDataObj = convertAdvObj(data.adverts); // Преобразуем данные в объект {advertId:data}
-      let oldData = ApiUtils.readRangeSS(
-        SS.getId(),
-        `${SheetNames.advList}!A2:D`,
-        "UNFORMATTED_VALUE",
-        "SERIAL_NUMBER"
-      );
+      let oldData = ApiUtils.readRangeSS(SS.getId(), `${SheetNames.advList}!A2:D`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
       const oldDataLength = oldData.length;
       let oldDataObj = oldData.reduce((res, row) => {
         res[row[0]] = row;
@@ -487,23 +414,18 @@ function getAdvCampList() {
   } catch (e) {
     console.log(e);
   }
-  let msg =
-    "Обновление списка рекламных кампаний завершено. Записано строк: " +
-    updatedDataLength;
+  let msg = "Обновление списка рекламных кампаний завершено. Записано строк: " + updatedDataLength;
   inform(SS, [msg, "Обновление списка РК"]);
-  try { inform(SS, [msg, `${SheetNames.advList}`]) } catch (e) { }
+  try {
+    inform(SS, [msg, `${SheetNames.advList}`]);
+  } catch (e) {}
 
   //   return { msg, propValue: null, setTriggFlag: false };
 
   function convertAdvObj(data) {
     const obj = data.reduce((res, adv) => {
       adv.advert_list.forEach((row) => {
-        res[row.advertId] = [
-          row.advertId,
-          adv.type,
-          adv.status,
-          DateUtils.getSerialNumberDate(new Date(row.changeTime)),
-        ];
+        res[row.advertId] = [row.advertId, adv.type, adv.status, DateUtils.getSerialNumberDate(new Date(row.changeTime))];
       });
       return res;
     }, {});
@@ -511,8 +433,9 @@ function getAdvCampList() {
     return obj;
   }
 }
-function statKeyWords(proceedFromPage) {
+function statKeyWords(SP) {
   // период загрузки берем из статистики рекламы
+  removeTriggers(["statKeyWordsTrigg"]);
   let { dateFromSer, dateToSer } = getHeaderDateParams(SheetNames.advStat);
   console.log("dateFromSer, dateToSer", dateFromSer, dateToSer);
   let message = "",
@@ -525,12 +448,7 @@ function statKeyWords(proceedFromPage) {
   // токен и даты с и по ---------------
   console.log(`Start "statKeyWords" for ${SS.getName()} spreadsheet.`);
   // Определяем диапазон дата
-  let statAB = ApiUtils.readRangeSS(
-    SSId,
-    `${SheetNames.advStat}!A4:B`,
-    "UNFORMATTED_VALUE",
-    "SERIAL_NUMBER"
-  );
+  let statAB = ApiUtils.readRangeSS(SSId, `${SheetNames.advStat}!A4:B`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
   let { maxDateStatAB, minDateStatAB } = statAB.reduce(
     (res, elm) => {
       if (elm[0] > res.maxDateStatAB) res.maxDateStatAB = elm[0];
@@ -543,18 +461,13 @@ function statKeyWords(proceedFromPage) {
   dateFromSer = Math.max(dateFromSer, minDateStatAB);
 
   console.log(
-    `Загрузка данных с ${DateUtils.getStrDateFromSerialNumberDate(
-      dateFromSer
-    )} по ${DateUtils.getStrDateFromSerialNumberDate(dateToSer)}`
+    `Загрузка данных с ${DateUtils.getStrDateFromSerialNumberDate(dateFromSer)} по ${DateUtils.getStrDateFromSerialNumberDate(
+      dateToSer
+    )}`
   );
   // Формируем сет из Список Кампаний(api) с условием тип кампании=8
   let campIdsSet = new Set();
-  let campIds = ApiUtils.readRangeSS(
-    SSId,
-    `${SheetNames.advList}!A2:D`,
-    "UNFORMATTED_VALUE",
-    "SERIAL_NUMBER"
-  );
+  let campIds = ApiUtils.readRangeSS(SSId, `${SheetNames.advList}!A2:D`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
   campIds.forEach((row) => {
     if (row[1] == 8) {
       campIdsSet.add(row[0]);
@@ -575,11 +488,7 @@ function statKeyWords(proceedFromPage) {
     // Отбираем из листа Cтат.Кампаний(api) данные за период обновления
     let campList = new Set();
     statAB.forEach((row, ind) => {
-      if (
-        row[0] >= dataPage.from &&
-        row[0] <= dataPage.to &&
-        campIdsSet.has(row[1])
-      ) {
+      if (row[0] >= dataPage.from && row[0] <= dataPage.to && campIdsSet.has(row[1])) {
         campList.add(row[1]);
         flowIndRows.add(ind);
       }
@@ -604,20 +513,15 @@ function statKeyWords(proceedFromPage) {
   // Формируем список кампаний
   let requestsLengthAll = flowRequsets.length;
   console.info("requests number is:", requestsLengthAll);
-
-  proceedFromPage = +(proceedFromPage || 0);
-  if (proceedFromPage) {
-    console.log(
-      `Продолжаем сбор с request:${proceedFromPage * maxRequestsPerLoad}`
-    ); //продолжаем со страницы proceedFromPage
+  let propValue = +(SP.getProperty("statKeyWords") || 0);
+  if (propValue) {
+    console.log(`Продолжаем сбор с request:${propValue * maxRequestsPerLoad}`); //продолжаем со страницы proceedFromPage
   } else {
-    console.log(
-      `Загрузка с начала списка. Максимальное кол-во запросов на сессию(~5мин.): ${maxRequestsPerLoad}`
-    );
+    console.log(`Загрузка с начала списка. Максимальное кол-во запросов на сессию: ${maxRequestsPerLoad}`);
   }
-  let frInd = proceedFromPage * maxRequestsPerLoad,
-    toInd = (proceedFromPage + 1) * maxRequestsPerLoad;
-  flowRequsets = flowRequsets.slice(frInd, toInd);
+  let fromInd = propValue * maxRequestsPerLoad,
+    toInd = (propValue + 1) * maxRequestsPerLoad;
+  flowRequsets = flowRequsets.slice(fromInd, toInd);
 
   let attempt = 0,
     maxAttempt = 6;
@@ -653,37 +557,29 @@ function statKeyWords(proceedFromPage) {
       attempt++;
     }
     if (attempt === maxAttempt) {
-      console.warn(
-        `Ответ на запрос ${counterPage} не был получен. Код:`,
-        responseCode
-      );
+      console.warn(`Ответ на запрос ${counterPage} не был получен. Код:`, responseCode);
     }
   }
 
   // вызов функции обработки и сохранения данных
-  proceedFromPage++;
+  propValue++;
   let isFinish = false,
-    msg,
-    propValue,
-    setTriggFlag;
-  if (requestsLengthAll > proceedFromPage * maxRequestsPerLoad) {
-    console.log(
-      "Устанавливаем триггер на следующий запуск скрипта через 1 минуту. Сбор со страницы:",
-      proceedFromPage * maxRequestsPerLoad
-    );
-    msg = "Устанавливаем триггер на следующий запуск.";
-    propValue = proceedFromPage;
-    setTriggFlag = true;
+    msg;
+  if (requestsLengthAll > propValue * maxRequestsPerLoad) {
+    msg = "Устанавливаем триггер на следующий запуск. Сбор со страницы:" + propValue * maxRequestsPerLoad;
+    SP.setProperty("statKeyWords", propValue);
+    ScriptApp.newTrigger("statKeyWordsTrigg").timeBased().after(6e4).create();
   } else {
     msg = "Выполнение завершено. Загружены все записи.";
-    propValue = null;
-    setTriggFlag = false;
+    SP.deleteProperty("statKeyWords");
     isFinish = true;
   }
 
   parseAndSaveResp(successRes, isFinish);
+  try {
+    inform(SS, [msg, "statKeyWords"]);
+  } catch (e) {}
   console.log("campsStatKeyWords FINISHED");
-  try { inform(SS, [msg, 'statKeyWords']) } catch (e) { }
 
   // парсинг и запись
   function parseAndSaveResp(successRes, isFinish) {
@@ -704,9 +600,7 @@ function statKeyWords(proceedFromPage) {
           { clicks: 0, sum: 0, views: 0 }
         );
         kwTotal.advId = flowAdvId[ind];
-        kwTotal.serKwDate = DateUtils.getSerialNumberDateNoGMT(
-          new Date(kwordObj.date)
-        );
+        kwTotal.serKwDate = DateUtils.getSerialNumberDateNoGMT(new Date(kwordObj.date));
         let key = `${kwTotal.advId}~${kwTotal.serKwDate}`;
         res[key] = kwTotal;
         return res;
@@ -718,19 +612,12 @@ function statKeyWords(proceedFromPage) {
 
     //!!! Обновление данных с определенной строки!! с dateFrom по DateTo взять из строки
     if (isFinish) {
-      aggregatedObjs = saveAndReadDataToJSON(
-        aggregatedObjs,
-        `temp${SSId.slice(-6)}`,
-        (save = false)
-      );
-      console.log(
-        "Всего строк данных перед записью: ",
-        Object.keys(aggregatedObjs).length
-      );
+      aggregatedObjs = saveAndReadDataToJSON(aggregatedObjs, `temp${SSId.slice(-6)}`, (save = false));
+      console.log("Всего строк данных перед записью: ", Object.keys(aggregatedObjs).length);
       if (Object.keys(aggregatedObjs).length) {
         newData = statAB.map((row, ind) => {
           if (flowIndRows.has(ind)) {
-            //  если номер строки вкходит в набором обновляемых строк
+            //  если номер строки входит в набором обновляемых строк
             let key = `${row[1]}~${row[0]}`;
             if (aggregatedObjs[key]) {
               let { clicks, sum, views } = aggregatedObjs[key]; // если получен объект с таким ключом обнолвяем строку
@@ -749,13 +636,8 @@ function statKeyWords(proceedFromPage) {
       }
     } else {
       if (Object.keys(aggregatedObjs).length) {
-        saveAndReadDataToJSON(
-          aggregatedObjs,
-          `temp${SSId.slice(-6)}`,
-          (save = true)
-        );
-        message +=
-          "Запись в temp-файл. Строк:" + Object.keys(aggregatedObjs).length;
+        saveAndReadDataToJSON(aggregatedObjs, `temp${SSId.slice(-6)}`, (save = true));
+        message += "Запись в temp-файл. Строк:" + Object.keys(aggregatedObjs).length;
       } else {
         message += "Данные для обновления не были получены.";
       }
@@ -765,8 +647,9 @@ function statKeyWords(proceedFromPage) {
     inform(SS, [message, "Обновление статистики ADV.keywords"]);
   }
 }
-function analyticNmIdPeriod(propValue) {
-    // propValue - номер элемента с которого продолжать загрузку
+function analyticNmIdPeriod(SP) {
+  // propValue - номер элемента с которого продолжать загрузку
+  removeTriggers(["analyticNmIdPeriodTrigg"]);
   let { dateFromSer, dateToSer } = getHeaderDateParams(analyticNmIdPeriod);
   const maxRequests = 14;
   // const maxRequests = 8; // DEBUG
@@ -775,16 +658,11 @@ function analyticNmIdPeriod(propValue) {
   let successResults = [],
     idReq = 0;
   console.log(
-    `Загрузка данных  с ${DateUtils.getStrDateFromSerialNumberDate(
-      dateFromSer
-    )} по ${DateUtils.getStrDateFromSerialNumberDate(dateToSer)}`
+    `Загрузка данных  с ${DateUtils.getStrDateFromSerialNumberDate(dateFromSer)} по ${DateUtils.getStrDateFromSerialNumberDate(
+      dateToSer
+    )}`
   );
-  let nmIds = ApiUtils.readRangeSS(
-    SSId,
-    `${SheetNames.products}!A2:C`,
-    "UNFORMATTED_VALUE",
-    "SERIAL_NUMBER"
-  );
+  let nmIds = ApiUtils.readRangeSS(SSId, `${SheetNames.products}!A2:C`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
   nmIds = nmIds.reduce((res, row) => {
     if (row[0] && row[2]) {
       res.push(row[0]);
@@ -805,9 +683,7 @@ function analyticNmIdPeriod(propValue) {
   let nowSer = DateUtils.getSerialNumberDate(new Date());
   while (dateToSer - dateFromSer > -1) {
     let begin = DateUtils.getStrDateTimeFromSerialNumberDate(dateToSer);
-    let end = DateUtils.getStrDateTimeFromSerialNumberDate(
-      Math.min(dateToSer + 1 - 1 / 864e5, nowSer)
-    );
+    let end = DateUtils.getStrDateTimeFromSerialNumberDate(Math.min(dateToSer + 1 - 1 / 864e5, nowSer));
     dates.push({ begin, end });
     dateToSer -= stepDays;
   }
@@ -834,29 +710,19 @@ function analyticNmIdPeriod(propValue) {
         },
       };
     });
-    console.log(
-      `Всего запросов:${requests.length}. Максимум запросов за 5 мин: 15.`
-    );
-    console.log("propValue:", propValue);
-    propValue = +(propValue || 0);
+    console.log(`Всего запросов:${requests.length}. Максимум запросов за 5 мин: 15.`);
+    const SP = PropertiesService.getScriptProperties();
+    let propValue = +(SP.getProperty("analyticNmIdPeriod") || 0);
     if (propValue) {
-      `Сбор данных будет продолжен с запроса:${propValue * maxRequests}`;
+      console.log(`Сбор данных будет продолжен с запроса:${propValue * maxRequests}`);
+    } else {
+      console.log(`Сбор данных будет произведён с начала списка`);
     }
-    requests = requests.slice(
-      propValue * maxRequests,
-      (propValue + 1) * maxRequests
-    );
-    console.log(
-      `Отобрано запросов:${requests.length}. Максимум запросов за 5 мин: 15.`
-    );
-
-    // requests = requests.slice(0, 15) // усеньшено до 7, т.к. происходят повторные запуски приложения через 2 минуты
-    // requests = requests.slice(0, 7)
+    requests = requests.slice(propValue * maxRequests, (propValue + 1) * maxRequests);
+    console.log(`Отобрано запросов:${requests.length}. Максимум запросов за 5 мин: 15.`);
 
     for (let request of requests) {
-      console.log(
-        `Before request: xRatelimitRemaining && waitFor:${xRatelimitRemaining}, ${waitFor}`
-      );
+      console.log(`Before request: xRatelimitRemaining && waitFor:${xRatelimitRemaining}, ${waitFor}`);
       if (!xRatelimitRemaining && waitFor > 0) {
         Utilities.sleep(waitFor);
       }
@@ -868,16 +734,10 @@ function analyticNmIdPeriod(propValue) {
           idReq++;
           break;
         } else if (result === -1) {
-          console.log(
-            `Запрос с кодом!=200: ${idReq} на попытке: ${attempt} повторный запрос через: ${
-              waitFor / 1000
-            }`
-          );
+          console.log(`Запрос с кодом!=200: ${idReq} на попытке: ${attempt} повторный запрос через: ${waitFor / 1000}`);
           attempt++;
         } else if (result > 1) {
-          console.log(
-            `Данные содержат более одной страницы. Сбор страница: ${result}`
-          );
+          console.log(`Данные содержат более одной страницы. Сбор страница: ${result}`);
           request.options.payload.page = result;
           attempt += 0.5; // добавляем по 0,5 к кол-ву попыток чтобы ограничить максимальное кол-во страниц 6-ю(изменить по необходимости)
         }
@@ -888,9 +748,7 @@ function analyticNmIdPeriod(propValue) {
       }
     }
     if (attempt === maxAttempt) {
-      console.log(
-        `Запрос ${idReq} не был обработан корректно. Превышен лимит запросов.`
-      );
+      console.log(`Запрос ${idReq} не был обработан корректно. Превышен лимит запросов.`);
     }
     console.log("successResults.length:");
     console.log(successResults.length);
@@ -901,10 +759,16 @@ function analyticNmIdPeriod(propValue) {
   propValue++;
   let finisedRequestsCount = propValue * maxRequests;
   let setTriggFlag = finisedRequestsCount < totalRequstCount ? true : false;
-  console.log("propValue:", propValue, "setTriggFlag:", setTriggFlag);
+  if (setTriggFlag) {
+    console.log("Устанавливаем триггер на следующий запуск скрипта через 1 минуту. Сбор со страницы:", propValue);
+    SP.setProperty("analyticNmIdPeriod", propValue);
+    ScriptApp.newTrigger("analyticNmIdPeriodTrigg").timeBased().after(6e4).create();
+  } else {
+    SP.deleteProperty("analyticNmIdPeriod");
+  }
   console.log(msg);
   console.log("analyticNmIdPeriod FINISHED");
-  return { msg, propValue, setTriggFlag };
+  // return { msg, propValue, setTriggFlag };
 
   // запрос на WB
   function getWbResponses(request, idReq) {
@@ -925,10 +789,7 @@ function analyticNmIdPeriod(propValue) {
     }
     if (respCode === 429) {
       xRatelimitRetry = headers["x-ratelimit-retry"];
-      console.log(
-        respCode,
-        `Превышено количество запросов в минуту, запрос #${idReq}, XRatelimitRetry: ${xRatelimitRetry}`
-      );
+      console.log(respCode, `Превышено количество запросов в минуту, запрос #${idReq}, XRatelimitRetry: ${xRatelimitRetry}`);
     } else if (respCode === 200) {
       let respJson = JSON.parse(response.getContentText());
       successResults.push(respJson.data);
@@ -944,11 +805,7 @@ function analyticNmIdPeriod(propValue) {
           res.push(
             [
               card.nmID,
-              Math.floor(
-                DateUtils.getSerialNumberDate(
-                  new Date(card.statistics.selectedPeriod.begin)
-                )
-              ),
+              Math.floor(DateUtils.getSerialNumberDate(new Date(card.statistics.selectedPeriod.begin))),
               card.statistics.selectedPeriod.openCardCount,
               card.statistics.selectedPeriod.addToCartCount,
               card.statistics.selectedPeriod.ordersCount,
@@ -959,11 +816,7 @@ function analyticNmIdPeriod(propValue) {
             ],
             [
               card.nmID,
-              Math.floor(
-                DateUtils.getSerialNumberDate(
-                  new Date(card.statistics.previousPeriod.begin)
-                )
-              ),
+              Math.floor(DateUtils.getSerialNumberDate(new Date(card.statistics.previousPeriod.begin))),
               card.statistics.previousPeriod.openCardCount,
               card.statistics.previousPeriod.addToCartCount,
               card.statistics.previousPeriod.ordersCount,
@@ -984,12 +837,7 @@ function analyticNmIdPeriod(propValue) {
       console.log("Ответ получен. Парсим.");
       msg = `Сбор данных analyticNmIdPeriod завершен. Добавлено строк: ${table.length}.`;
 
-      let oldData = ApiUtils.readRangeSS(
-        SSId,
-        `${analyticNmIdPeriod}!A5:I`,
-        "UNFORMATTED_VALUE",
-        "SERIAL_NUMBER"
-      );
+      let oldData = ApiUtils.readRangeSS(SSId, `${analyticNmIdPeriod}!A5:I`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
       let oldDataObj = oldData.reduce((res, row) => {
         let key = `${row[0]}~${row[1]}`;
         res[key] = row;
@@ -1025,17 +873,12 @@ function singleKeyWords() {
   const headers = { Authorization: getkey("rekl") };
   // Определяем диапазон дата
   console.log(
-    `Загрузка данных  с ${DateUtils.getStrDateFromSerialNumberDate(
-      dateFromSer
-    )} по ${DateUtils.getStrDateFromSerialNumberDate(dateToSer)}`
+    `Загрузка данных  с ${DateUtils.getStrDateFromSerialNumberDate(dateFromSer)} по ${DateUtils.getStrDateFromSerialNumberDate(
+      dateToSer
+    )}`
   );
   // Формируем сет из список Кампаний по чекбокс===true
-  let campIds = ApiUtils.readRangeSS(
-    SSId,
-    `${SheetNames.advList}!A2:E`,
-    "UNFORMATTED_VALUE",
-    "SERIAL_NUMBER"
-  );
+  let campIds = ApiUtils.readRangeSS(SSId, `${SheetNames.advList}!A2:E`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
   campIds = campIds.filter((row) => row[0] && row[4]);
   if (campIds.length > maxRequestsPerLoad) {
     inform(SS, [
@@ -1110,10 +953,7 @@ function singleKeyWords() {
       attempt++;
     }
     if (attempt === maxAttempt) {
-      console.warn(
-        `Ответ на запрос ${counterPage} не был получен. Код:`,
-        responseCode
-      );
+      console.warn(`Ответ на запрос ${counterPage} не был получен. Код:`, responseCode);
     }
   }
 
@@ -1136,18 +976,9 @@ function singleKeyWords() {
       let kwOutObjs = keywordsArr.reduce((res, kwordObj) => {
         //kwordObj - {date,stats:[clicks,sum,views]}
         serKwDate = DateUtils.getSerialNumberDateNoGMT(new Date(kwordObj.date));
-        kwordObj.stats = kwordObj.stats
-          .sort((a, b) => a.views - b.views)
-          .slice(0, 100);
+        kwordObj.stats = kwordObj.stats.sort((a, b) => a.views - b.views).slice(0, 100);
         let advArr = kwordObj.stats.map((row) => {
-          return [
-            serKwDate,
-            flowAdvId[ind],
-            row.keyword,
-            row.clicks,
-            row.sum,
-            row.views,
-          ];
+          return [serKwDate, flowAdvId[ind], row.keyword, row.clicks, row.sum, row.views];
         });
         res.push(...advArr);
         return res;
@@ -1166,11 +997,7 @@ function singleKeyWords() {
         allData = SheetUtils.clearByAddBlankRow(allData, rowsToClear);
       }
       allData.unshift(header);
-      let res = ApiUtils.writeToSS(
-        SS.getId(),
-        allData,
-        `${SheetNames.keyWords}!A5`
-      );
+      let res = ApiUtils.writeToSS(SS.getId(), allData, `${SheetNames.keyWords}!A5`);
       if (res) {
         message += "Все данные получены. Сбор завершен.";
       }
@@ -1183,16 +1010,13 @@ function singleKeyWords() {
     inform(SS, [message, "Обновление статистики ADV.keywords"]);
   }
 }
-/**
- * reportTypes = ["DETAIL_HISTORY_REPORT","SEARCH_QUERIES_PREMIUM_REPORT_TEXT"]
- */
-function analyticsJam() {
-  analyticsJam((reportType = "DETAIL_HISTORY_REPORT"));
-}
 function searchTextJam() {
   analyticsJam((reportType = "SEARCH_QUERIES_PREMIUM_REPORT_TEXT"));
 }
-function analyticsJam(reportType = "SEARCH_QUERIES_PREMIUM_REPORT_TEXT") {
+/**
+ * reportTypes = ["DETAIL_HISTORY_REPORT","SEARCH_QUERIES_PREMIUM_REPORT_TEXT"]
+ */
+function analyticsJam(reportType = "DETAIL_HISTORY_REPORT") {
   // function analyticsJam(reportType = "DETAIL_HISTORY_REPORT") {
   // const head = ["Артикул", "Арт. продавца", "Наименование товара", "Дата", "Переходы в карточку", "Положили в корзину", "Процент выкупа"]
   // 1. Готовим запрос:
@@ -1206,12 +1030,7 @@ function analyticsJam(reportType = "SEARCH_QUERIES_PREMIUM_REPORT_TEXT") {
   } else if (reportType === "SEARCH_QUERIES_PREMIUM_REPORT_TEXT") {
     sheetName = SheetNames.searchJam;
   }
-  let dataOptions = ApiUtils.readRangeSS(
-    SSId,
-    `${sheetName}!B1:D1`,
-    "UNFORMATTED_VALUE",
-    "SERIAL_NUMBER"
-  );
+  let dataOptions = ApiUtils.readRangeSS(SSId, `${sheetName}!B1:D1`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
   let tomorrowSerial = Math.ceil(DateUtils.getSerialNumberDate(new Date()));
   let dateFromSer = dataOptions?.[0]?.[0] || tomorrowSerial - 4;
   let dateToSer = dataOptions?.[0]?.[2] || tomorrowSerial;
@@ -1262,8 +1081,7 @@ function analyticsJam(reportType = "SEARCH_QUERIES_PREMIUM_REPORT_TEXT") {
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
   };
-  let requestReportUrl =
-    "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/downloads";
+  let requestReportUrl = "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/downloads";
   // console.log(options);
   // return
   // Запрос на формирование отчета:
@@ -1305,17 +1123,11 @@ function analyticsJam(reportType = "SEARCH_QUERIES_PREMIUM_REPORT_TEXT") {
       resultArr = resultArr.filter((row) => row.id === uuid);
     }
     if (resultArr[0].status === "SUCCESS") {
-      inform(SS, [
-        `Отчет id:${uuid} сформирован на сервере и готов к загрузке.`,
-        "Jam аналитика",
-      ]);
+      inform(SS, [`Отчет id:${uuid} сформирован на сервере и готов к загрузке.`, "Jam аналитика"]);
       break;
     } else {
       if (limitResp > respCounter) {
-        inform(SS, [
-          `Отчет не сформирован, повтор проверки через 30 сек.`,
-          "Jam аналитика",
-        ]);
+        inform(SS, [`Отчет не сформирован, повтор проверки через 30 сек.`, "Jam аналитика"]);
       } else {
         let msg = `Отчет не сформирован в течении ${respCounter} попыток. Попробуйте позже`;
         inform(SS, [msg, "Jam аналитика"]);
@@ -1330,8 +1142,7 @@ function analyticsJam(reportType = "SEARCH_QUERIES_PREMIUM_REPORT_TEXT") {
     data = tabToObjectHeaders(data, reportType);
     let lastRow = SS.getSheetByName(sheetName).getLastRow();
     let rowsToClear = lastRow - data.length;
-    if (rowsToClear > 0)
-      data = SheetUtils.clearByAddBlankRow(data, rowsToClear);
+    if (rowsToClear > 0) data = SheetUtils.clearByAddBlankRow(data, rowsToClear);
     ApiUtils.writeToSS(SSId, data, `${sheetName}!A4`);
     msg = `Записано строк:${data.length}`;
   } else {
@@ -1349,8 +1160,7 @@ function analyticsJam(reportType = "SEARCH_QUERIES_PREMIUM_REPORT_TEXT") {
     if (uuid) {
       options.filter = uuid;
     }
-    let url =
-      "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/downloads";
+    let url = "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/downloads";
     let response = UrlFetchApp.fetch(url, options);
     return response;
   }
@@ -1361,9 +1171,7 @@ function analyticsJam(reportType = "SEARCH_QUERIES_PREMIUM_REPORT_TEXT") {
       contentType: "application/json",
       muteHttpExceptions: true,
     };
-    let url =
-      "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/downloads/file/" +
-      uuid;
+    let url = "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/downloads/file/" + uuid;
     let response = UrlFetchApp.fetch(url, options);
     let zipBlob = response.getBlob();
     zipBlob.setContentType("application/zip");
@@ -1433,60 +1241,8 @@ function analyticsJam(reportType = "SEARCH_QUERIES_PREMIUM_REPORT_TEXT") {
     return fixedTable;
   }
 }
-function getHeaderDateParams(rangeStr) {
-  let dataOptions = ApiUtils.readRangeSS(
-    SSId,
-    `${rangeStr}!B1:B2`,
-    "UNFORMATTED_VALUE",
-    "SERIAL_NUMBER"
-  );
-  let tomorrowSerial = Math.ceil(DateUtils.getSerialNumberDate(new Date()));
-  let dateFromSer = dataOptions?.[0]?.[0] || tomorrowSerial - 4;
-  let dateToSer = dataOptions?.[1]?.[0] || tomorrowSerial;
-  return { dateFromSer, dateToSer };
-}
-//DEBUG
-function testTriggSet(propValue) {
-  // 1. Запуск на 20 сек
-  propValue = +(propValue || 0);
-  let count = 0;
-  while (count < 3) {
-    count++;
-    Utilities.sleep(5000);
-    console.log("repeat:", count);
-  }
-  let msg;
-  if (propValue < 1) {
-    propValue++, (setTriggFlag = true);
-    msg = "Триггер для полей [clicks,sum,views] установлен. Count:" + propValue;
-  } else {
-    setTriggFlag = false;
-    msg = "Триггер не требуется устанавливать. Count:" + propValue;
-  }
-
-  console.log(msg);
-  return { msg, propValue, setTriggFlag };
-}
-function restartAppTest() {
-  // растягиваем выполнеие функции и смотри когда перезапуск. Каждые 30 сек сигнал
-  for (let i = 0; i < 12; i += 0.5) {
-    console.log("Повтор:", i);
-    Utilities.sleep(30000);
-  }
-  return { msg: "test Finish", propValue, setTriggFlag: false };
-}
-function testAn() {
-  SSId = "1fVwPRevZnLnJWWMhIVNMB5j0jAidEDrueVn9khsAWwY";
-  // SSId = "1GqUvXk1rAfQZ4O79HY6jAXgS1Q3bsV1ytXdFwIgFOzI";
-  SS = SpreadsheetApp.openById(SSId);
-  SpreadsheetApp.setActiveSpreadsheet(SS);
-  // analyticNmIdPeriod(0)
-  searchTextsJam(0);
-}
 function searchTextsJam(propValue) {
-  let { dateFromSer, dateToSer } = getHeaderDateParams(
-    SheetNames.searchTextsJam
-  );
+  let { dateFromSer, dateToSer } = getHeaderDateParams(SheetNames.searchTextsJam);
   const maxRequests = 10;
   // const maxRequests = 4; // DEBUG
   console.log(`Start "searchTextsJam" for ${SS.getName()} spreadsheet.`);
@@ -1494,18 +1250,13 @@ function searchTextsJam(propValue) {
   let successResults = [],
     idReq = 0;
   console.log(
-    `Загрузка данных  с ${DateUtils.getStrDateFromSerialNumberDate(
-      dateFromSer
-    )} по ${DateUtils.getStrDateFromSerialNumberDate(dateToSer)}`
+    `Загрузка данных  с ${DateUtils.getStrDateFromSerialNumberDate(dateFromSer)} по ${DateUtils.getStrDateFromSerialNumberDate(
+      dateToSer
+    )}`
   );
   const nmIdsTotalMax = 90,
     nmIdsPerReq = 30;
-  let nmIdsTable = ApiUtils.readRangeSS(
-    SSId,
-    `${SheetNames.products}!A2:C`,
-    "UNFORMATTED_VALUE",
-    "SERIAL_NUMBER"
-  );
+  let nmIdsTable = ApiUtils.readRangeSS(SSId, `${SheetNames.products}!A2:C`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
   nmIdsTable = nmIdsTable.reduce((res, row) => {
     if (row[0] && row[2]) {
       res.push(row[0]);
@@ -1566,23 +1317,14 @@ function searchTextsJam(propValue) {
         },
       };
     });
-    console.log(
-      `Всего запросов:${requests.length}. Максимум запросов за 5 мин: 15.`
-    );
+    console.log(`Всего запросов:${requests.length}. Максимум запросов за 5 мин: 15.`);
     propValue = +(propValue || 0);
     console.log("propValue:", propValue);
     if (propValue) {
-      console.log(
-        `Сбор данных будет продолжен с запроса:${propValue * maxRequests}`
-      );
+      console.log(`Сбор данных будет продолжен с запроса:${propValue * maxRequests}`);
     }
-    requests = requests.slice(
-      propValue * maxRequests,
-      (propValue + 1) * maxRequests
-    );
-    console.log(
-      `Отобрано запросов:${requests.length}. Максимум запросов за 5 мин: 15.`
-    );
+    requests = requests.slice(propValue * maxRequests, (propValue + 1) * maxRequests);
+    console.log(`Отобрано запросов:${requests.length}. Максимум запросов за 5 мин: 15.`);
 
     // console.log(JSON.stringify(requests, null, 2));
     // return { msg: "DEBUG searchTextsJam", propValue: null, setTriggFlag: false }
@@ -1591,9 +1333,7 @@ function searchTextsJam(propValue) {
     // requests = requests.slice(0, 7)
 
     for (let request of requests) {
-      console.log(
-        `Before request: xRatelimitRemaining && waitFor:${xRatelimitRemaining}, ${waitFor}`
-      );
+      console.log(`Before request: xRatelimitRemaining && waitFor:${xRatelimitRemaining}, ${waitFor}`);
       console.log("DEBUG:", request); // DEBUG
       if (!xRatelimitRemaining && waitFor > 0) {
         Utilities.sleep(waitFor);
@@ -1606,16 +1346,10 @@ function searchTextsJam(propValue) {
           idReq++;
           break;
         } else if (result === -1) {
-          console.log(
-            `Запрос с кодом!=200: ${idReq} на попытке: ${attempt} повторный запрос через: ${
-              waitFor / 1000
-            }`
-          );
+          console.log(`Запрос с кодом!=200: ${idReq} на попытке: ${attempt} повторный запрос через: ${waitFor / 1000}`);
           attempt++;
         } else if (result > 1) {
-          console.log(
-            `Данные содержат более одной страницы. Сбор страница: ${result}`
-          );
+          console.log(`Данные содержат более одной страницы. Сбор страница: ${result}`);
           request.options.payload.page = result;
           attempt += 0.5; // добавляем по 0,5 к кол-ву попыток чтобы ограничить максимальное кол-во страниц 6-ю(изменить по необходимости)
         }
@@ -1626,9 +1360,7 @@ function searchTextsJam(propValue) {
       }
     }
     if (attempt === maxAttempt) {
-      console.log(
-        `Запрос ${idReq} не был обработан корректно. Превышен лимит запросов.`
-      );
+      console.log(`Запрос ${idReq} не был обработан корректно. Превышен лимит запросов.`);
     }
     console.log("successResults.length:");
     console.log(successResults.length);
@@ -1664,10 +1396,7 @@ function searchTextsJam(propValue) {
     }
     if (respCode === 429) {
       xRatelimitRetry = headers["x-ratelimit-retry"];
-      console.log(
-        respCode,
-        `Превышено количество запросов в минуту, запрос #${idReq}, XRatelimitRetry: ${xRatelimitRetry}`
-      );
+      console.log(respCode, `Превышено количество запросов в минуту, запрос #${idReq}, XRatelimitRetry: ${xRatelimitRetry}`);
     } else if (respCode === 200) {
       let respJson = JSON.parse(response.getContentText());
 
@@ -1676,9 +1405,7 @@ function searchTextsJam(propValue) {
       // let serNumDateFields = DateUtils.getSerialNumberDate(dateFields)
       // console.log('dateFromRequest:',dateFromRequest, 'dateFields:',dateFields, 'serNumDateFields:',serNumDateFields);
 
-      respJson.data.date = DateUtils.getSerialNumberDate(
-        new Date(JSON.parse(request.options.payload).currentPeriod.start)
-      );
+      respJson.data.date = DateUtils.getSerialNumberDate(new Date(JSON.parse(request.options.payload).currentPeriod.start));
       // saveResult(respJson.data, 'respJson_data') // DEBUG
       successResults.push(respJson.data);
       return respJson.hasNext ? respJson.page + 1 : 0;
@@ -1719,12 +1446,7 @@ function searchTextsJam(propValue) {
       console.log("Ответ получен. Парсим.");
       msg = `Сбор данных analyticNmIdPeriod завершен. Добавлено строк: ${table.length}.`;
 
-      let oldData = ApiUtils.readRangeSS(
-        SSId,
-        `${SheetNames.searchTextsJam}!A5:N`,
-        "UNFORMATTED_VALUE",
-        "SERIAL_NUMBER"
-      );
+      let oldData = ApiUtils.readRangeSS(SSId, `${SheetNames.searchTextsJam}!A5:N`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
       let oldDataObj = oldData.reduce((res, row) => {
         let key = `${row[0]}~${row[1]}~${row[2]}`;
         res[key] = row;
@@ -1742,8 +1464,7 @@ function searchTextsJam(propValue) {
         .sort((a, b) => a[2] - b[2])
         .sort((a, b) => `${a[1]}`.localeCompare(`${b[1]}`))
         .sort((a, b) => a[0] - b[0]);
-      let lastRow =
-        SS.getSheetByName(SheetNames.searchTextsJam).getLastRow() - 4;
+      let lastRow = SS.getSheetByName(SheetNames.searchTextsJam).getLastRow() - 4;
       let addClearRows = lastRow - table.length;
       if (addClearRows > 0) {
         table = SheetUtils.clearByAddBlankRow(table, addClearRows);
@@ -1764,18 +1485,13 @@ function searchReportGroupJam(propValue) {
   let successResults = [],
     idReq = 0;
   console.log(
-    `Загрузка данных  с ${DateUtils.getStrDateFromSerialNumberDate(
-      dateFromSer
-    )} по ${DateUtils.getStrDateFromSerialNumberDate(dateToSer)}`
+    `Загрузка данных  с ${DateUtils.getStrDateFromSerialNumberDate(dateFromSer)} по ${DateUtils.getStrDateFromSerialNumberDate(
+      dateToSer
+    )}`
   );
   const nmIdsTotalMax = 90,
     nmIdsPerReq = 30;
-  let nmIdsTable = ApiUtils.readRangeSS(
-    SSId,
-    `${SheetNames.products}!A2:C`,
-    "UNFORMATTED_VALUE",
-    "SERIAL_NUMBER"
-  );
+  let nmIdsTable = ApiUtils.readRangeSS(SSId, `${SheetNames.products}!A2:C`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
   nmIdsTable = nmIdsTable.reduce((res, row) => {
     if (row[0] && row[2]) {
       res.push(row[0]);
@@ -1836,23 +1552,14 @@ function searchReportGroupJam(propValue) {
         },
       };
     });
-    console.log(
-      `Всего запросов:${requests.length}. Максимум запросов за 5 мин: 15.`
-    );
+    console.log(`Всего запросов:${requests.length}. Максимум запросов за 5 мин: 15.`);
     propValue = +(propValue || 0);
     console.log("propValue:", propValue);
     if (propValue) {
-      console.log(
-        `Сбор данных будет продолжен с запроса:${propValue * maxRequests}`
-      );
+      console.log(`Сбор данных будет продолжен с запроса:${propValue * maxRequests}`);
     }
-    requests = requests.slice(
-      propValue * maxRequests,
-      (propValue + 1) * maxRequests
-    );
-    console.log(
-      `Отобрано запросов:${requests.length}. Максимум запросов за 5 мин: 15.`
-    );
+    requests = requests.slice(propValue * maxRequests, (propValue + 1) * maxRequests);
+    console.log(`Отобрано запросов:${requests.length}. Максимум запросов за 5 мин: 15.`);
 
     // console.log(JSON.stringify(requests, null, 2));
     // return { msg: "DEBUG searchTextsJam", propValue: null, setTriggFlag: false }
@@ -1861,9 +1568,7 @@ function searchReportGroupJam(propValue) {
     // requests = requests.slice(0, 7)
 
     for (let request of requests) {
-      console.log(
-        `Before request: xRatelimitRemaining && waitFor:${xRatelimitRemaining}, ${waitFor}`
-      );
+      console.log(`Before request: xRatelimitRemaining && waitFor:${xRatelimitRemaining}, ${waitFor}`);
       if (!xRatelimitRemaining && waitFor > 0) {
         Utilities.sleep(waitFor);
       }
@@ -1875,16 +1580,10 @@ function searchReportGroupJam(propValue) {
           idReq++;
           break;
         } else if (result === -1) {
-          console.log(
-            `Запрос с кодом!=200: ${idReq} на попытке: ${attempt} повторный запрос через: ${
-              waitFor / 1000
-            }`
-          );
+          console.log(`Запрос с кодом!=200: ${idReq} на попытке: ${attempt} повторный запрос через: ${waitFor / 1000}`);
           attempt++;
         } else if (result > 1) {
-          console.log(
-            `Данные содержат более одной страницы. Сбор страница: ${result}`
-          );
+          console.log(`Данные содержат более одной страницы. Сбор страница: ${result}`);
           request.options.payload.page = result;
           attempt += 0.5; // добавляем по 0,5 к кол-ву попыток чтобы ограничить максимальное кол-во страниц 6-ю(изменить по необходимости)
         }
@@ -1895,9 +1594,7 @@ function searchReportGroupJam(propValue) {
       }
     }
     if (attempt === maxAttempt) {
-      console.log(
-        `Запрос ${idReq} не был обработан корректно. Превышен лимит запросов.`
-      );
+      console.log(`Запрос ${idReq} не был обработан корректно. Превышен лимит запросов.`);
     }
     console.log("successResults.length:");
     console.log(successResults.length);
@@ -1933,15 +1630,10 @@ function searchReportGroupJam(propValue) {
     }
     if (respCode === 429) {
       xRatelimitRetry = headers["x-ratelimit-retry"];
-      console.log(
-        respCode,
-        `Превышено количество запросов в минуту, запрос #${idReq}, XRatelimitRetry: ${xRatelimitRetry}`
-      );
+      console.log(respCode, `Превышено количество запросов в минуту, запрос #${idReq}, XRatelimitRetry: ${xRatelimitRetry}`);
     } else if (respCode === 200) {
       let respJson = JSON.parse(response.getContentText());
-      respJson.data.date = DateUtils.getSerialNumberDate(
-        new Date(JSON.parse(request.options.payload).currentPeriod.start)
-      );
+      respJson.data.date = DateUtils.getSerialNumberDate(new Date(JSON.parse(request.options.payload).currentPeriod.start));
       successResults.push(respJson.data);
       return respJson.hasNext ? respJson.page + 1 : 0;
     }
@@ -1981,12 +1673,7 @@ function searchReportGroupJam(propValue) {
       console.log("Ответ получен. Парсим.");
       msg = `Сбор данных analyticNmIdPeriod завершен. Добавлено строк: ${table.length}.`;
 
-      let oldData = ApiUtils.readRangeSS(
-        SSId,
-        `${SheetNames.searchTextsJam}!A5:N`,
-        "UNFORMATTED_VALUE",
-        "SERIAL_NUMBER"
-      );
+      let oldData = ApiUtils.readRangeSS(SSId, `${SheetNames.searchTextsJam}!A5:N`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
       let oldDataObj = oldData.reduce((res, row) => {
         let key = `${row[0]}~${row[1]}~${row[2]}`;
         res[key] = row;
@@ -2004,8 +1691,7 @@ function searchReportGroupJam(propValue) {
         .sort((a, b) => a[2] - b[2])
         .sort((a, b) => `${a[1]}`.localeCompare(`${b[1]}`))
         .sort((a, b) => a[0] - b[0]);
-      let lastRow =
-        SS.getSheetByName(SheetNames.searchTextsJam).getLastRow() - 4;
+      let lastRow = SS.getSheetByName(SheetNames.searchTextsJam).getLastRow() - 4;
       let addClearRows = lastRow - table.length;
       if (addClearRows > 0) {
         table = SheetUtils.clearByAddBlankRow(table, addClearRows);
@@ -2021,9 +1707,7 @@ function getClustersToSearchText() {
   // var url = 'http://45.155.146.48:48263/search/';
   // var url = 'http://81.177.166.230/search/';
   var url = "https://clusters.1gb.ru/search/";
-  let data = ApiUtils.readRangeSS(SSId, `${searchTextsJam}!B5:B`).flat(
-    Infinity
-  );
+  let data = ApiUtils.readRangeSS(SSId, `${searchTextsJam}!B5:B`).flat(Infinity);
   let searchValues = [...new Set(data)];
   let payload = JSON.stringify({ values: searchValues });
   let options = {
@@ -2052,4 +1736,26 @@ function getClustersToSearchText() {
   }
   console.log(msg);
   return { msg, propValue: null, setTriggFlag: false };
+}
+function getHeaderDateParams(rangeStr) {
+  let dataOptions = ApiUtils.readRangeSS(SSId, `${rangeStr}!B1:B2`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
+  let tomorrowSerial = Math.ceil(DateUtils.getSerialNumberDate(new Date()));
+  let dateFromSer = dataOptions?.[0]?.[0] || tomorrowSerial - 4;
+  let dateToSer = dataOptions?.[1]?.[0] || tomorrowSerial;
+  return { dateFromSer, dateToSer };
+}
+// DEBUG
+function testAn() {
+  SSId = "1fVwPRevZnLnJWWMhIVNMB5j0jAidEDrueVn9khsAWwY";
+  // SSId = "1GqUvXk1rAfQZ4O79HY6jAXgS1Q3bsV1ytXdFwIgFOzI";
+  SS = SpreadsheetApp.openById(SSId);
+  SpreadsheetApp.setActiveSpreadsheet(SS);
+  // analyticNmIdPeriod(0)
+  searchTextsJam(0);
+}
+function testHistory() {
+  SSId = "1fVwPRevZnLnJWWMhIVNMB5j0jAidEDrueVn9khsAWwY";
+  SS = SpreadsheetApp.openById(SSId);
+  SpreadsheetApp.setActiveSpreadsheet(SS);
+  updateHistory();
 }

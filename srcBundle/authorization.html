@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <?!= include('css'); ?>
+</head>
+
+<body>
+  <div>Для прохождения авторизации нажмите кнопку Авторизация.</div>
+  <input type="button" value="Авторизация" onclick="authorization()"/>
+  <input type="button" value="Закрыть" onclick="google.script.host.close()" />
+</body>
+<script>
+  function authorization(){
+    const url = "https://script.google.com/macros/s/AKfycbzSiS3hK8cRcfKRiCQo2GyiuxbRm3xhbPrXuwQ7NSlujM5Udr-YiC-1bedXP7Ms0ASb/exec?author=true";
+    // const url = "https://script.google.com/macros/s/AKfycbwCMpIzWoM9Djm6wxOTrtgTe8Nxh4A8WoWLXaQ7SDQ/dev?author=true";
+    window.open(url);
+    google.script.host.close()
+  }
+</script>
+
+</html>

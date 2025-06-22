@@ -1,3 +1,12 @@
+/** code.gs */
+// DEBUG
+function testHistory() {
+  // SSId = "1fVwPRevZnLnJWWMhIVNMB5j0jAidEDrueVn9khsAWwY";
+  // SS = SpreadsheetApp.openById(SSId);
+  // SpreadsheetApp.setActiveSpreadsheet(SS);
+  // updateHistory();
+  getAdvCampList()
+}
 // снять для отладки
 // let sprs = SpreadsheetApp.openById("1ZOgynpxji02tlWHVTbgNc6soCx_7afF5bKNIjaO-9fw")
 // SpreadsheetApp.setActiveSpreadsheet(sprs)
@@ -15,7 +24,7 @@ var SS = SpreadsheetApp.getActiveSpreadsheet(),
     advHistory: "История затрат(api)",
   };
 function getProducts() {
-  checkAccess()
+  checkAccess_()
   let arrProducts = [],
     formData,
     options;
@@ -96,6 +105,7 @@ function testAdv() {
  * временно возможный интервал получения статистики сокращен до 31 суток
  */
 function getAdvStatistic() {
+  checkAccess_()
   let msg = "";
   let { dateFromSer, dateToSer } = getHeaderDateParams(SheetNames.advStat);
   if (dateToSer - dateFromSer > 31) {
@@ -314,7 +324,7 @@ function getHystorySpentForAdv(table) {
   return table;
 }
 function updateHistory() {
-  checkAccess()
+  checkAccess_()
   let { dateFromSer, dateToSer } = getHeaderDateParams(SheetNames.advHistory);
   let days = dateToSer - dateFromSer + 1;
 
@@ -374,7 +384,7 @@ function updateHistory() {
   }
 }
 function getAdvCampList() {
-  checkAccess()
+  checkAccess_()
   //сбор информации о рекламных кампаниях на лист "Список Кампаний(api)!"
   let ss = SS.getSheetByName(SheetNames.advList);
   SheetUtils.safeRemoveFilter(ss);
@@ -473,6 +483,7 @@ function getAdvCampList() {
   }
 }
 function statKeyWords(SP) {
+  checkAccess_()
   // период загрузки берем из статистики рекламы
   removeTriggers(["statKeyWordsTrigg"]);
   let { dateFromSer, dateToSer } = getHeaderDateParams(SheetNames.advStat);
@@ -649,7 +660,7 @@ function statKeyWords(SP) {
 
     //!!! Обновление данных с определенной строки!! с dateFrom по DateTo взять из строки
     if (isFinish) {
-      aggregatedObjs = saveAndReadDataToJSON(aggregatedObjs, `temp${SSId.slice(-6)}`, (save = false));
+      aggregatedObjs = saveAndReadDataToJSON_(aggregatedObjs, `temp${SSId.slice(-6)}`, (save = false));
       console.log("Всего строк данных перед записью: ", Object.keys(aggregatedObjs).length);
       if (Object.keys(aggregatedObjs).length) {
         newData = statAB.map((row, ind) => {
@@ -673,7 +684,7 @@ function statKeyWords(SP) {
       }
     } else {
       if (Object.keys(aggregatedObjs).length) {
-        saveAndReadDataToJSON(aggregatedObjs, `temp${SSId.slice(-6)}`, (save = true));
+        saveAndReadDataToJSON_(aggregatedObjs, `temp${SSId.slice(-6)}`, (save = true));
         message += "Запись в temp-файл. Строк:" + Object.keys(aggregatedObjs).length;
       } else {
         message += "Данные для обновления не были получены.";
@@ -685,6 +696,7 @@ function statKeyWords(SP) {
   }
 }
 function analyticNmIdPeriod(SP) {
+  checkAccess_()
   // propValue - номер элемента с которого продолжать загрузку
   removeTriggers(["analyticNmIdPeriodTrigg"]);
   let { dateFromSer, dateToSer } = getHeaderDateParams(SheetNames.analyticNmIdPeriod);
@@ -902,8 +914,8 @@ function analyticNmIdPeriod(SP) {
     return msg;
   }
 }
-
 function keyWords() {
+  checkAccess_()
   let { dateFromSer, dateToSer } = getHeaderDateParams(SheetNames.keyWords);
   let message = "";
   const maxRequestsPerLoad = 100; // кол-во запросрв за один запуск скрипта 100
@@ -1043,237 +1055,6 @@ function keyWords() {
       message += "Данные для обновления не были получены.";
     }
     inform(SS, [message, SheetNames.keyWords]);
-  }
-}
-function searchTextJam() {
-  analyticsJam((reportType = "SEARCH_QUERIES_PREMIUM_REPORT_TEXT"));
-}
-/**
- * reportTypes = ["DETAIL_HISTORY_REPORT","SEARCH_QUERIES_PREMIUM_REPORT_TEXT"]
- */
-
-function analyticsJam(reportType = "DETAIL_HISTORY_REPORT") {
-  // const head = ["Артикул", "Арт. продавца", "Наименование товара", "Дата", "Переходы в карточку", "Положили в корзину", "Процент выкупа"]
-  // 1. Готовим запрос:
-  // чтение периода
-  let SS = SpreadsheetApp.getActive();
-  let SSId = SS.getId();
-  let headers = { Authorization: getkey("analytics") },
-    sheetName;
-  if (reportType === "DETAIL_HISTORY_REPORT") {
-    sheetName = analyticsJam;
-  } else if (reportType === "SEARCH_QUERIES_PREMIUM_REPORT_TEXT") {
-    sheetName = SheetNames.searchJam;
-  }
-  let dataOptions = ApiUtils.readRangeSS(SSId, `${sheetName}!B1:D1`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
-  let tomorrowSerial = Math.ceil(DateUtils.getSerialNumberDate(new Date()));
-  let dateFromSer = dataOptions?.[0]?.[0] || tomorrowSerial - 4;
-  let dateToSer = dataOptions?.[0]?.[2] || tomorrowSerial;
-  let dateFrom = DateUtils.getStrDateFromSerialNumberDate(dateFromSer);
-  let dateTo = DateUtils.getStrDateFromSerialNumberDate(dateToSer);
-  let uuid = Utilities.getUuid(); // генерируем UUID отчета
-  console.log("uuid:", uuid);
-  let nmIDs = ApiUtils.readRangeSS(SSId, `${SheetNames.products}!A2:C`);
-  let filteredNmIDs = nmIDs.filter((row) => row[2]);
-  if (filteredNmIDs.length < 1000 && filteredNmIDs.length) {
-    nmIDs = filteredNmIDs.map((row) => row[0]);
-  } else {
-    nmIDs = [];
-  }
-  let payload;
-  if (reportType === "DETAIL_HISTORY_REPORT") {
-    payload = {
-      id: uuid,
-      reportType: reportType,
-      userReportName: "Card report",
-      params: {
-        nmIDs: nmIDs,
-        startDate: dateFrom,
-        endDate: dateTo,
-        timezone: "Europe/Moscow",
-        aggregationLevel: "day",
-        skipDeletedNm: false,
-      },
-    };
-  } else if (reportType === "SEARCH_QUERIES_PREMIUM_REPORT_TEXT") {
-    payload = {
-      id: uuid,
-      reportType: reportType,
-      userReportName: "Search report",
-      params: {
-        nmIDs: nmIDs,
-        currentPeriod: { start: dateFrom, end: dateTo },
-        topOrderBy: "orders",
-        orderBy: { field: "orders", mode: "desc" },
-        limit: 30,
-      },
-    };
-  }
-  let options = {
-    headers: headers,
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true,
-  };
-  let requestReportUrl = "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/downloads";
-  // console.log(options);
-  // return
-  // Запрос на формирование отчета:
-  let respCounter = 0,
-    limitResp = 3;
-  while (limitResp > respCounter) {
-    respCounter++;
-    let response = UrlFetchApp.fetch(requestReportUrl, options);
-    console.log("code:", response.getResponseCode());
-    console.log(response.getContentText());
-    if (response.getResponseCode() === 200) {
-      let respJson = JSON.parse(response.getContentText());
-      let respRes = respJson?.data;
-      console.log(`Статус запроса на создание отчета: ${respRes}`);
-      break;
-    } else {
-      console.log("Код ответа на запрос:", response.getResponseCode());
-      if (limitResp > respCounter) {
-        console.log(`Повтор запроса через 20 секунд`);
-        Utilities.sleep(20000);
-      } else {
-        let msg = `Лимит запросов(${limitResp}) на формирование отчета исчерпан. Попробуйте позже.`;
-        inform(SS, [msg, "Jam аналитика"]);
-        throw new Error(msg);
-      }
-    }
-  }
-  Utilities.sleep(20000);
-  // Запрос на готовность отчета:
-  respCounter = 0;
-  limitResp = 20;
-  while (limitResp > respCounter) {
-    let isReportReadyResponse = getReportList(uuid);
-    respCounter++;
-    let resultArr;
-    if (isReportReadyResponse.getResponseCode() == 200) {
-      resultArr = JSON.parse(isReportReadyResponse.getContentText()).data;
-      // console.log(resultArr);
-      resultArr = resultArr.filter((row) => row.id === uuid);
-    }
-    if (resultArr[0].status === "SUCCESS") {
-      inform(SS, [`Отчет id:${uuid} сформирован на сервере и готов к загрузке.`, "Jam аналитика"]);
-      break;
-    } else {
-      if (limitResp > respCounter) {
-        inform(SS, [`Отчет не сформирован, повтор проверки через 30 сек.`, "Jam аналитика"]);
-      } else {
-        let msg = `Отчет не сформирован в течении ${respCounter} попыток. Попробуйте позже`;
-        inform(SS, [msg, "Jam аналитика"]);
-        throw new Error(msg);
-      }
-    }
-    Utilities.sleep(30000);
-  }
-  let data = getReport(uuid);
-  let msg;
-  if (data.length) {
-    data = tabToObjectHeaders(data, reportType);
-    let lastRow = SS.getSheetByName(sheetName).getLastRow();
-    let rowsToClear = lastRow - data.length;
-    if (rowsToClear > 0) data = SheetUtils.clearByAddBlankRow(data, rowsToClear);
-    ApiUtils.writeToSS(SSId, data, `${sheetName}!A4`);
-    msg = `Записано строк:${data.length}`;
-  } else {
-    msg = "Данные не были получены";
-  }
-  inform(SS, [msg, `Jam Аналитика`]);
-
-  function getReportList(uuid) {
-    let options = {
-      headers: headers,
-      method: "get",
-      contentType: "application/json",
-      muteHttpExceptions: true,
-    };
-    if (uuid) {
-      options.filter = uuid;
-    }
-    let url = "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/downloads";
-    let response = UrlFetchApp.fetch(url, options);
-    return response;
-  }
-  function getReport(uuid) {
-    let options = {
-      headers: headers,
-      method: "get",
-      contentType: "application/json",
-      muteHttpExceptions: true,
-    };
-    let url = "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/downloads/file/" + uuid;
-    let response = UrlFetchApp.fetch(url, options);
-    let zipBlob = response.getBlob();
-    zipBlob.setContentType("application/zip");
-    let unzipFile = Utilities.unzip(zipBlob);
-    let data = Utilities.parseCsv(unzipFile[0].getDataAsString());
-    return data;
-  }
-  function tabToObjectHeaders(table, reportType) {
-    let keys = table.shift();
-    let tableObjs = table.map((row) => {
-      let rowObj = keys.reduce((res, key, ind) => {
-        res[key] = row[ind];
-        return res;
-      }, {});
-      return rowObj;
-    });
-    let fixedKeys;
-    if (reportType === "DETAIL_HISTORY_REPORT") {
-      fixedKeys = [
-        "nmID",
-        "dt",
-        "openCardCount",
-        "addToCartCount",
-        "ordersCount",
-        "ordersSumRub",
-        "buyoutsCount",
-        "buyoutsSumRub",
-        "cancelCount",
-        "cancelSumRub",
-        "addToCartConversion",
-        "cartToOrderConversion",
-        "buyoutPercent",
-      ];
-    } else if (reportType === "SEARCH_QUERIES_PREMIUM_REPORT_TEXT") {
-      fixedKeys = [
-        "Text",
-        "NmID",
-        "SubjectName",
-        "BrandName",
-        "VendorCode",
-        "Name",
-        "Rating",
-        "FeedbackRating",
-        "MinPrice",
-        "MaxPrice",
-        "Frequency",
-        "MedianPosition",
-        "AveragePosition",
-        "OpenCard",
-        "OpenCardPercentile",
-        "AddToCart",
-        "AddToCartPercentile",
-        "OpenToCart",
-        "OpenToCartPercentile",
-        "Orders",
-        "OrdersPercentile",
-        "CartToOrder",
-        "CartToOrderPercentile",
-        "Visibility",
-      ];
-    }
-    let fixedTable = tableObjs.map((elm) => {
-      let row = fixedKeys.map((key) => elm?.[key] || "");
-      return row;
-    });
-    fixedTable.unshift(fixedKeys);
-    return fixedTable;
   }
 }
 function searchTextsJam(SP) {
@@ -1515,233 +1296,6 @@ function searchTextsJam(SP) {
     return msg;
   }
 }
-function searchReportGroupJam(SP) {
-  removeTriggers(["searchReportGroupJamTrigg"]);
-  let { dateFromSer, dateToSer } = getHeaderDateParams(searchTextsJam);
-  const maxRequests = 10;
-  // const maxRequests = 4; // DEBUG
-  console.log(`Start "searchTextsJam" for ${SS.getName()} spreadsheet.`);
-  const headers = { Authorization: getkey("rekl") };
-  let successResults = [],
-    idReq = 0;
-  console.log(
-    `Загрузка данных  с ${DateUtils.getStrDateFromSerialNumberDate(dateFromSer)} по ${DateUtils.getStrDateFromSerialNumberDate(
-      dateToSer
-    )}`
-  );
-  const nmIdsTotalMax = 90,
-    nmIdsPerReq = 30;
-  let nmIdsTable = ApiUtils.readRangeSS(SSId, `${SheetNames.products}!A2:C`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
-  nmIdsTable = nmIdsTable.reduce((res, row) => {
-    if (row[0] && row[2]) {
-      res.push(row[0]);
-    }
-    return res;
-  }, []); // [nmId1,nmId2..]
-  nmIdsTable = nmIdsTable.slice(-nmIdsTotalMax);
-  let nmIdsPages = SysUtils.pagination(nmIdsTable, nmIdsPerReq);
-  let payload = {
-    // "nmIds": nmIds,
-    topOrderBy: "openToCart",
-    orderBy: {
-      field: "avgPosition",
-      mode: "asc",
-    },
-    limit: 30,
-  };
-
-  let dates = [],
-    msg;
-  while (dateToSer >= dateFromSer) {
-    let currentPeriod = DateUtils.getStrDateFromSerialNumberDate(dateFromSer);
-    for (let nmIds of nmIdsPages) {
-      dates.push({ currentPeriod, nmIds });
-    }
-    dateFromSer++;
-  }
-
-  let propValue = +(SP.getProperty("searchReportGroupJam") || 0);
-
-  let attempt,
-    maxAttempt = 3,
-    gapTime = 21e3,
-    table = [],
-    startTime,
-    waitFor = 0,
-    xRatelimitRetry,
-    xRatelimitRemaining = 1;
-  let totalRequstCount = dates.length;
-  if (totalRequstCount) {
-    let requests = dates.map((datesStr) => {
-      payload.nmIds = datesStr.nmIds;
-      payload.currentPeriod = {
-        start: datesStr.currentPeriod,
-        end: datesStr.currentPeriod,
-      };
-      return {
-        url: "https://seller-analytics-api.wildberries.ru/api/v2/search-report/product/search-texts",
-        options: {
-          method: "post",
-          headers,
-          payload: JSON.stringify(payload),
-          contentType: "application/json",
-          muteHttpExceptions: true,
-        },
-      };
-    });
-    console.log(`Всего запросов:${requests.length}. Максимум запросов за 5 мин: 15.`);
-    propValue = +(propValue || 0);
-    console.log("propValue:", propValue);
-    if (propValue) {
-      console.log(`Сбор данных будет продолжен с запроса:${propValue * maxRequests}`);
-    }
-    requests = requests.slice(propValue * maxRequests, (propValue + 1) * maxRequests);
-    console.log(`Отобрано запросов:${requests.length}. Максимум запросов за 5 мин: 15.`);
-
-    // requests = requests.slice(0, 15) // усеньшено до 7, т.к. происходят повторные запуски приложения через 2 минуты
-    // requests = requests.slice(0, 7)
-
-    for (let request of requests) {
-      console.log(`Before request: xRatelimitRemaining && waitFor:${xRatelimitRemaining}, ${waitFor}`);
-      if (!xRatelimitRemaining && waitFor > 0) {
-        Utilities.sleep(waitFor);
-      }
-      attempt = 0;
-      while (attempt < maxAttempt) {
-        let result = getWbResponses(request, idReq);
-        if (result === 0) {
-          waitFor = startTime + gapTime - Date.now();
-          idReq++;
-          break;
-        } else if (result === -1) {
-          console.log(`Запрос с кодом!=200: ${idReq} на попытке: ${attempt} повторный запрос через: ${waitFor / 1000}`);
-          attempt++;
-        } else if (result > 1) {
-          console.log(`Данные содержат более одной страницы. Сбор страница: ${result}`);
-          request.options.payload.page = result;
-          attempt += 0.5; // добавляем по 0,5 к кол-ву попыток чтобы ограничить максимальное кол-во страниц 6-ю(изменить по необходимости)
-        }
-        waitFor = xRatelimitRetry ? (xRatelimitRetry + 1) * 1000 : gapTime;
-        if (!xRatelimitRemaining && waitFor > 0) {
-          Utilities.sleep(waitFor);
-        }
-      }
-    }
-    if (attempt === maxAttempt) {
-      console.log(`Запрос ${idReq} не был обработан корректно. Превышен лимит запросов.`);
-    }
-    console.log("successResults.length:");
-    console.log(successResults.length);
-    // saveResult(successResults,"successResultsJam")
-    msg = parseAndSaveResp(successResults);
-  } else {
-    msg = `Возможно период для запроса задан не корректно.`;
-  }
-  propValue++;
-  let finisedRequestsCount = propValue * maxRequests;
-  let setTriggFlag = finisedRequestsCount < totalRequstCount ? true : false;
-  if (setTriggFlag) {
-    console.log("Устанавливаем триггер на следующий запуск скрипта через 1 минуту. Сбор со страницы:", propValue);
-    SP.setProperty("searchReportGroupJam", propValue);
-    ScriptApp.newTrigger("searchReportGroupJamTrigg").timeBased().after(6e4).create();
-  } else {
-    SP.deleteProperty("searchReportGroupJam");
-  }
-  console.log(msg);
-  console.log("searchReportGroupJam FINISHED");
-
-  // запрос на WB
-  function getWbResponses(request, idReq) {
-    console.log("Запроc: ", idReq);
-    xRatelimitRetry = 0;
-    let response = UrlFetchApp.fetch(request.url, request.options); // full_data - массив сформированных отправленных запросов в процессе получения данных
-    startTime = Date.now();
-    Utilities.sleep(500); // время для прогрузки (подобрано для WB экспериментально)
-    let respCode = response.getResponseCode();
-    let headers = response.getHeaders();
-    xRatelimitRemaining = +(headers["x-ratelimit-remaining"] || 0);
-    console.log(
-      `Запрос ${idReq}: code ${respCode}, xRatelimitRemaining:${xRatelimitRemaining} ${(message =
-        respCode == 400 ? response.getContentText() : "")}.`
-    );
-    if (message) {
-      console.log(message);
-    }
-    if (respCode === 429) {
-      xRatelimitRetry = headers["x-ratelimit-retry"];
-      console.log(respCode, `Превышено количество запросов в минуту, запрос #${idReq}, XRatelimitRetry: ${xRatelimitRetry}`);
-    } else if (respCode === 200) {
-      let respJson = JSON.parse(response.getContentText());
-      respJson.data.date = DateUtils.getSerialNumberDate(new Date(JSON.parse(request.options.payload).currentPeriod.start));
-      successResults.push(respJson.data);
-      return respJson.hasNext ? respJson.page + 1 : 0;
-    }
-    return -1; // если 0 - след запрос, если -1 - повтор этого, если > 0 тот же запрос но след страница = return value
-  }
-
-  function parseAndSaveResp(successResults) {
-    table = successResults.reduce((concTab, respData) => {
-      let out,
-        currentDate = Math.floor(respData.date);
-      if (Array.isArray(respData.items)) {
-        out = respData.items.reduce((res, item) => {
-          res.push([
-            currentDate,
-            item.text,
-            item.nmId,
-            item.frequency.current,
-            item.weekFrequency,
-            item.medianPosition.current,
-            item.avgPosition.current,
-            item.openCard.current,
-            item.openCard.percentile,
-            item.addToCart.current,
-            item.addToCart.percentile,
-            item.orders.current,
-            item.orders.percentile,
-            item.visibility.current,
-          ]);
-          return res;
-        }, []);
-      }
-      concTab = concTab.concat(out);
-      return concTab;
-    }, []);
-    // SAVING
-    if (table.length) {
-      console.log("Ответ получен. Парсим.");
-      msg = `Сбор данных analyticNmIdPeriod завершен. Добавлено строк: ${table.length}.`;
-
-      let oldData = ApiUtils.readRangeSS(SSId, `${SheetNames.searchTextsJam}!A5:N`, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
-      let oldDataObj = oldData.reduce((res, row) => {
-        let key = `${row[0]}~${row[1]}~${row[2]}`;
-        res[key] = row;
-        return res;
-      }, {});
-      let dataObj = table.reduce((res, row) => {
-        let key = `${row[0]}~${row[1]}~${row[2]}`;
-        res[key] = row;
-        return res;
-      }, {});
-      Object.assign(oldDataObj, dataObj);
-      table = Object.values(oldDataObj);
-
-      table
-        .sort((a, b) => a[2] - b[2])
-        .sort((a, b) => `${a[1]}`.localeCompare(`${b[1]}`))
-        .sort((a, b) => a[0] - b[0]);
-      let lastRow = SS.getSheetByName(SheetNames.searchTextsJam).getLastRow() - 4;
-      let addClearRows = lastRow - table.length;
-      if (addClearRows > 0) {
-        table = SheetUtils.clearByAddBlankRow(table, addClearRows);
-      }
-      ApiUtils.writeToSS(SSId, table, `${SheetNames.searchTextsJam}!A5`);
-    } else {
-      msg = "Данные для обновления не были получены.";
-    }
-    return msg;
-  }
-}
 function getClustersToSearchText() {
   // var url = 'http://45.155.146.48:48263/search/';
   // var url = 'http://81.177.166.230/search/';
@@ -1787,55 +1341,819 @@ function getHeaderDateParams(rangeStr) {
  * check account
  */
 function getAccount() {
-
 }
-
-
-// DEBUG
-function testAn() {
-  SSId = "1fVwPRevZnLnJWWMhIVNMB5j0jAidEDrueVn9khsAWwY";
-  // SSId = "1GqUvXk1rAfQZ4O79HY6jAXgS1Q3bsV1ytXdFwIgFOzI";
-  SS = SpreadsheetApp.openById(SSId);
-  SpreadsheetApp.setActiveSpreadsheet(SS);
-  // analyticNmIdPeriod(0)
-  searchTextsJam(0);
-}
-function testHistory() {
-  // SSId = "1fVwPRevZnLnJWWMhIVNMB5j0jAidEDrueVn9khsAWwY";
-  // SS = SpreadsheetApp.openById(SSId);
-  // SpreadsheetApp.setActiveSpreadsheet(SS);
-  updateHistory();
-  getAdvCampList()
-}
-
 // --- menu.js ---
 function getMenu(box = "") {
   const ui = SpreadsheetApp.getUi();
-  if (box.includes("init")) {
-    var menu = ui.createMenu("Меню");
-    menu.addItem("Инициализация приложения", "JL.appInit")
-  } else {
-    // checkAccess()
-    var menu = ui.createMenu("Меню");
-    menu.addItem("1.Обновить Товары", "getProducts")
-    menu.addItem("2.Обновить список РК", "getAdvCampList")
-      .addSeparator()
-    menu.addItem("3.Обновить историю РК", "updateHistory")
-    menu.addItem("4.Обновить статистику РК", "getAdvStatistic")
-      .addSeparator()
-    menu.addItem("5.Обновить Аналитику Джем", "analyticNmIdPeriod")
-    menu.addItem("6.Обновить keywords", "keyWords")
-      .addSeparator()
-    menu.addItem("7.1.Поисковый запрос Джем", "searchTextsJam")
-    menu.addItem("7.2.Обновить кластеры Поисковый запрос", "getClustersToSearchText")
-      .addSeparator()
-      .addSeparator()
-    menu.addItem("Авторизация", "JL.auth")
-  }
+  let menu = ui.createMenu("Меню");
+  menu.addItem("1.Обновить Товары", "getProducts")
+  menu.addItem("2.Обновить список РК", "getAdvCampList")
+    .addSeparator()
+  menu.addItem("3.Обновить историю РК", "updateHistory")
+  menu.addItem("4.Обновить статистику РК", "getAdvStatistic")
+    .addSeparator()
+  menu.addItem("5.Обновить Аналитику Джем", "analyticNmIdPeriod")
+  menu.addItem("6.Обновить keywords", "keyWords")
+    .addSeparator()
+  menu.addItem("7.1.Поисковый запрос Джем", "searchTextsJam")
+  menu.addItem("7.2.Обновить кластеры Поисковый запрос", "getClustersToSearchText")
+    .addSeparator()
+    .addSeparator()
+  menu.addItem("Авторизация", "JL.auth")
   menu.addToUi();
 }
 
-function appInit() {
-  ScriptApp.newTrigger('getMenu').forSpreadsheet(SSId).onOpen().create();
-  getMenu()
+/** common.gs */
+const SheetUtils = {
+  safeRemoveFilter: function (ss) {
+    try {
+      const filter = ss.getFilter();
+      if (filter) filter.remove();
+    } catch (e) { /* ignore */ }
+  },
+  insertRowsForNewData: function (ss, lastRow, dataLength) {
+    //1. опредлить нужно ли добавлять строки для записи
+    let maxRows = ss.getMaxRows()
+    let howMany = lastRow + dataLength - maxRows
+    if (howMany > 0) { ss.insertRowsAfter(maxRows, howMany); console.log(`Добавлено пустых строк:${howMany}`) }
+  },
+  fillLastUndefined: function (table, length_row = 15, filler = "") {
+    table.forEach((row) => {
+      for (i = length_row; i >= 0; i--) {
+        if (row[i] !== undefined) { break }
+        row[i] = filler;
+      }
+    });
+  },
+  clearByAddBlankRow: function (table, addRows) {
+    let maxRowLength = table.reduce((maxLength, row) => {
+      if (row.length > maxLength) maxLength = row.length;
+      return maxLength;
+    }, 0);
+    const blankArr = Array(addRows).fill(Array(maxRowLength).fill(""));
+    table = table.concat(blankArr);
+    return table;
+  },
+  // *******Группировка таблиц**********************************
+  group_list: function (rows_arr, clmns_group_by, clmns_to_sum) {
+    // L('группировка oldArr: ')
+    // L(rows_arr.slice(0,10))
+    rows_arr.forEach((e, i) => {
+      // добавляет в массив колонку(в конец) с значением групировки объединенным из разных столбцов исходного массива
+      // нужно для групппировки по нескольким полям 
+
+      let group_value = ''
+      clmns_group_by.forEach(function (k) { group_value += rows_arr[i][k] })
+      rows_arr[i].push(group_value)
+    })
+    let i1 = rows_arr[0].length
+    let i = i1 - 1
+
+    let group_to_values = rows_arr.reduce(function (obj, item) {
+      obj[item[i]] = obj[item[i]] || [];
+      obj[item[i]].push(item);
+      return obj;
+    }, {});
+
+    let valuesArr = Object.values(group_to_values)
+    let newArr = []
+    valuesArr.forEach(function (elm) {
+      let row = SheetUtils.colSum(elm, clmns_to_sum)
+      row.pop()
+      newArr.push(row)
+    })
+    // L('newArr: ')
+    // L(newArr.slice(0,10))
+    return newArr
+  },
+  groupListFast: function (rows_arr, clmns_group_by, clmns_to_sum) {
+    const groupMap = {};
+    const rowsCount = rows_arr.length;
+
+    for (let i = 0; i < rowsCount; i++) {
+      const row = rows_arr[i];
+      let groupKey = clmns_group_by.map(k => row[k]).join('|');
+
+      if (groupKey in groupMap) {
+        const group = groupMap[groupKey];
+        clmns_to_sum.forEach(col => {
+          group.sums[col] = (group.sums[col] || 0) + (row[col] || 0);
+        });
+      } else {
+        groupMap[groupKey] = {
+          groupFields: clmns_group_by.map(k => row[k]),
+          sums: clmns_to_sum.reduce((acc, col) => {
+            acc[col] = row[col] || 0;
+            return acc;
+          }, {})
+        };
+      }
+    }
+
+    return Object.values(groupMap).map(group => {
+      const resultRow = [...group.groupFields];
+      clmns_to_sum.forEach(col => {
+        resultRow[col] = group.sums[col];
+      });
+      return resultRow;
+    });
+  },
+  // *******Блок обновления таблиц *********************************
+  updateTable: function (old_table, new_table, key_fields_nums) {
+    // принимает аргументами две таблицы, удаляет по ключевым полям значения из старой таблицы замещая строками из новой таблицы
+    // если в новой таблице нет ключей соответ старым ключам, оставляет старые записи, добавляет новые строки.
+    //!!! В каждой таблице строки должны быть уникальны в пределах таблицы, иначе дубликаты затрутся
+
+    let old_t_obj = SheetUtils.arr_to_obj_key(old_table, key_fields_nums);
+    let new_t_obj = SheetUtils.arr_to_obj_key(new_table, key_fields_nums);
+    Object.assign(old_t_obj, new_t_obj)
+    let new_tab = Object.values(old_t_obj)
+    return new_tab
+  },
+  update_table_keep_column: function (old_table, new_table, key_fields_nums, keep_col) {
+    // принимает аргументами две таблицы, замещает по ключам значения из страой таблицы новыми
+    // если в новой таблице нет ключей соответ старым ключам, оставляет старые записи, добавляет/переписывает новые если есть.
+    // сохраняет значение из колонки keep_col в обновленных данных: update_table_keep_column(old_table, new_table, [0,1], 3)
+    let old_t_obj = SheetUtils.arr_to_obj_key(old_table, key_fields_nums);
+    let new_t_obj = SheetUtils.arr_to_obj_key(new_table, key_fields_nums);
+
+    for (row in new_t_obj) {
+      old_t_obj[row] = new_t_obj[row].concat(old_t_obj[row] ? old_t_obj[row][keep_col] : "")
+    }
+    return Object.values(old_t_obj)
+  },
+  updateTableKeepColumns: function (old_table, new_table, key_fields_nums, keep_cols) {
+    let old_t_obj = SheetUtils.arr_to_obj_key(old_table, key_fields_nums);
+    let new_t_obj = SheetUtils.arr_to_obj_key(new_table, key_fields_nums);
+    let new_obj = {};
+    Object.assign(new_obj, old_t_obj, new_t_obj);
+    for (let row in old_t_obj) {
+      keep_cols.forEach(function (col) {
+        new_obj[row][col] = old_t_obj[row][col];
+      });
+    }
+    return Object.values(new_obj);
+  },
+  arr_to_obj_key: function (arr, key_fields_nums) {
+    // обращает таблицу в объект, назначая ключом для каждой строки сочетание значений столбцов, указанных в key_fields_nums
+    // key_fields_nums = [0,] - массив индексов колонок
+    // arr = [['a', 1], ['b', 2], ['c', 3]] - таблица значений;
+    // на выходе: {"a":[['a', 1],"b":['b', 2],"c":['c', 3]]}
+
+    const res = arr.reduce(function (acc, curr) {
+      let key_field = ''
+      for (let k of key_fields_nums) {
+        key_field += curr[k]
+      }
+      acc[key_field] = curr
+      return acc
+    }, {});
+    return res
+  },
+  getDifferenceTab: function (new_tab, old_tab) {
+    // возвращает таблицу из строк new_tab, которых нет в old_tab
+    let old_tab_keys = old_tab.map((r) => {
+      let t = [...r]
+      for (i = 8; i < 18; i += 1) { t[i] = (parseInt(r[i])).toLocaleString("ru-RU") }
+      return t.toString()
+    })
+    let nw_tab = []
+    new_tab.forEach(function (r) {
+      let t = [...r]
+      for (i = 8; i < 18; i += 1) { t[i] = (parseInt(r[i])).toLocaleString("ru-RU") }
+      console.log("элемент: ", t.toString(), " найден в строке #: ", old_tab_keys.indexOf(t.toString()))
+      if (old_tab_keys.indexOf(t.toString()) === -1) { nw_tab.push(r) }
+    })
+    return nw_tab
+  },
+  tofillSkipCells: function (table, las_elm_ind, filler = "") {
+    // выравнивает длинну строк таблицы table до величины row_length, заполняя последний элемент более коротких строк
+    //  значением из fill. Промежуточные недостающие элементы оставляет пустыми (Nan). Нужно для записи через API.readRangeSS->writeToSS
+    table.forEach((elm) => { if (elm[las_elm_ind] === undefined) { elm[las_elm_ind] = filler } })
+    return table
+  },
+  fillAllUndefined: function (table, length_row = 15, filler = "") {
+    // Заполняет все пустые(undefined) значения таблицы table filler-ом на длину строки length_row
+    // const runTimer = Date.now()
+    table.forEach((row) => {
+      for (i = 0; i < length_row; i++) {
+        if (row[i] === undefined) {
+          row[i] = filler
+        }
+      }
+    })
+    // console.log("runtime is:", Date.now() - runTimer)
+    return table
+  },
+  colSum: function (arr, clmns_to_sum, to_round = false) {
+    // сворачивает колонки массива arr суммируя перечисленные в списке[clmns_to_sum] 
+    // !!! остальные значения колонок заменяет значениями из первой строки
+    let out = arr[0]
+    // arr[0].forEach(function (e) { out.push(e) })
+    for (let i = 1; i < arr.length; i++) {
+      for (let j of clmns_to_sum) {
+        if (to_round) {
+          out[j] = Math.round((+ out[j] + (arr[i][j] || 0)) * 100) / 100
+        } else {
+          out[j] = + out[j] + (arr[i][j] || 0)
+        };
+      }
+    }
+    return out;
+  }
+};
+const ApiUtils = {
+  batchWriteToSS: function (spreadsheetId, values, ranges, valueInputOption = "USER_ENTERED") {
+    try {
+      const valueRange = ranges.map((range, ind) => { return { "range": range, "values": values[ind] } })
+      const resource = { data: valueRange, valueInputOption: valueInputOption };
+      Sheets.Spreadsheets.Values.batchUpdate(resource, spreadsheetId)
+      console.info(`batchWriteToSS ok!`);
+      return true;
+    } catch (e) {
+      console.error(`batchWriteToSS failed with error ${e.stack}`);
+      throw new Error(e.stack);
+    }
+  },
+  writeToSS: function (spreadsheetId, rowValues, range, valueInputOption = 'USER_ENTERED', okMsg = "writeToSS") {
+    // let range = 'Лист1!B1'
+    const request = {
+      'valueInputOption': valueInputOption,
+      'data': [
+        {
+          'range': range,
+          'majorDimension': 'ROWS',
+          'values': rowValues
+        }
+      ]
+    };
+    try {
+      const response = Sheets.Spreadsheets.Values.batchUpdate(request, spreadsheetId);
+      if (response) {
+        console.log(`${okMsg}: ok!`);
+        return true;
+      }
+      console.log('response null');
+      return false
+    } catch (e) {
+      console.log(`${okMsg}: failed with error ${e.message}`);
+      return false
+    }
+  },
+  appendToSS: function (spreadsheetId, rowValues, range, valueInputOption = "USER_ENTERED", okMsg = "appendToSS") {
+    let resource = {
+      majorDimension: "ROWS",
+      values: rowValues,
+    };
+    let optionalArgs = { valueInputOption: valueInputOption };
+    try {
+      const response = Sheets.Spreadsheets.Values.append(
+        resource,
+        spreadsheetId,
+        range,
+        optionalArgs
+      );
+      if (response) {
+        console.log(`${okMsg}: ok!`);
+        return true;
+      }
+      console.log("response null");
+      return false;
+    } catch (e) {
+      console.log("appendToSS failed with error %s", e.message);
+      throw new Error(`${okMsg}: ошибка записи данных ${e.message}`);
+    }
+  },
+  readRangeSS: function (spreadsheetId, range, valueRenderOption = "UNFORMATTED_VALUE", dateTimeRenderOption = "FORMATTED_STRING") {
+    try {
+      optionalArgs = {
+        dateTimeRenderOption: dateTimeRenderOption,// FORMATTED_STRING || SERIAL_NUMBER
+        valueRenderOption: valueRenderOption  // UNFORMATTED_VALUE || FORMATTED_VALUE || FORMULA
+      }
+      const response = Sheets.Spreadsheets.Values.get(
+        spreadsheetId, range, optionalArgs
+      );
+      if (response.values) {
+        return response.values;
+      }
+      console.info(`(Не ошибка) readRangeSS. Попытка чтения пустого диапазона: ${range}. return []`);
+      return []
+    } catch (e) {
+      console.log('readRangeSS failed with error %s', e.message);
+      return false
+    }
+  },
+  batchUpdateTextFormatSS: function (SS, ss, range) {
+    // SS, ss: as spreasheet and sheet objects, range: as "A1:D4"
+    const spreadsheetId = SS.getId()
+    const SHEET_ID = ss.getSheetId()
+    const RC = ApiUtils.toStartEndIndexes(ss, range)
+    try {
+      let resource = {
+        "requests": [
+          {
+            "repeatCell": {
+              "range": {
+                "sheetId": SHEET_ID,
+                "startRowIndex": RC.startRowIndex,
+                "endRowIndex": RC.endRowIndex,
+                "startColumnIndex": RC.startColumnIndex,
+                "endColumnIndex": RC.endColumnIndex
+              },
+              "cell": {
+                "userEnteredFormat": {
+                  "numberFormat": {
+                    "type": "TEXT"
+                    // "type": "NUMBER",
+                    // "pattern": "@"
+                  }
+                }
+              },
+              "fields": "userEnteredFormat.numberFormat"
+            }
+          }
+        ]
+      }
+      const response = Sheets.Spreadsheets.batchUpdate(resource, spreadsheetId)
+      if (response) {
+        return response;
+      }
+      console.info(`формат для ${range} не установлен`);
+      return []
+    } catch (e) {
+      console.log('batchUpdateSS failed with error %s', e.message);
+      return []
+    }
+  },
+  batchReadRangeSS: function (spreadsheetId, ranges, valueRenderOption = "UNFORMATTED_VALUE", dateTimeRenderOption = "FORMATTED_STRING", majorDimension = "ROWS") {
+    /* let ranges = ['Продажи позаказно!B1:C20','Продажи позаказно!E5:F200'] */
+    try {
+      let optionalArgs = {
+        dateTimeRenderOption: dateTimeRenderOption, // FORMATTED_STRING || SERIAL_NUMBER
+        valueRenderOption: valueRenderOption, // UNFORMATTED_VALUE || FORMATTED_VALUE || FORMULA
+        majorDimension: majorDimension, //"ROWS" || "COLUMNS"
+        ranges: ranges,
+      };
+      const response = Sheets.Spreadsheets.Values.batchGet(spreadsheetId, optionalArgs);
+      if (response.valueRanges) {
+        return response.valueRanges;
+      }
+      console.info(
+        `(Не ошибка) batchReadRangeSS.Попытка чтения пустого диапазона: ${ranges}.return[]`
+      );
+      return [];
+    } catch (e) {
+      console.log("batchReadRangeSS failed with error %s", e.message);
+      return [];
+    }
+  },
+  getAllRangesValues: function (SS, ranges, valueRenderOption = "UNFORMATTED_VALUE", dateTimeRenderOption = "FORMATTED_STRING", majorDimension = "ROWS") {
+    let dataRanges = this.batchReadRangeSS(SS.getId(), ranges, valueRenderOption, dateTimeRenderOption, majorDimension);
+    let rangesValues = dataRanges.map((range) => range.values || []);
+    return rangesValues;
+  },
+  toStartEndIndexes: function (ss, reference) {
+    const range = ss.getRange(reference);
+    const r1c1 = { startRowIndex: range.getRow() - 1, startColumnIndex: range.getColumn() - 1 }
+    r1c1.endRowIndex = range.getNumRows() + r1c1.startRowIndex
+    r1c1.endColumnIndex = range.getNumColumns() + r1c1.startColumnIndex
+    return r1c1;
+  },
+};
+const DateUtils = {
+  getSerialNumberDateNoGMT: function (date) { return (date.getTime()) / 864e5 + 25569; },
+  getSerialNumberDate: function (date) { return (date.getTime() + 3 * 60 * 60 * 1000) / 864e5 + 25569; },
+  getDateFromSerialNumberDate: function (dateSer) { return new Date((dateSer - 25569) * 864e5 - 3 * 60 * 60 * 1000) },
+  getStrDateFromSerialNumberDate: function (dateSer) { return Utilities.formatDate(new Date((dateSer - 25569) * 864e5), "GMT", "yyyy-MM-dd") },
+  getStrDateTimeFromSerialNumberDate: function (dateSer) { return Utilities.formatDate(new Date((dateSer - 25569) * 864e5), "GMT", "yyyy-MM-dd HH:mm:ss") },
+  /*covert "01.01.2020" or "01-01-2020" to Date*/
+  date_from_str: function (d_str, spliter = ".") { try { d1 = new Date(...d_str.split(spliter).reverse()); return d1.setMonth(d1.getMonth() - 1) } catch (e) { console.log(e, "на elm: ", d_str) } },
+  convertDateColumnToLocaleDate: function (table, col) {
+    // преобразует объект Date в колонке col таблицы table в формат "18.05.2020". Возвращает таблицу с преобразованной колонкой дат.
+    table = table.map(function (x) {
+      x[col] = new Date(x[col]).toLocaleDateString("ru-RU")
+      return x
+    })
+    return table
+  },
+  convertDateColumnToUTCDate: function (table, col) {
+    // преобразует объект Date в колонке col таблицы table в формат "18.05.2020". Возвращает таблицу с преобразованной колонкой дат.
+    table = table.map(function (x) {
+      x[col] = new Date(x[col]).toDateString("ru-RU")
+      return x
+    })
+    return table
+  },
+  convertDateColumnTo_3hDate: function (table, col) {
+    // преобразует объект Date в колонке col таблицы table в формат "18.05.2020". Возвращает таблицу с преобразованной колонкой дат.
+    table = table.map(function (x) {
+      x[col] = Utilities.formatDate(new Date(x[col]), "GMT+3:00", "dd-MM-yyyy")
+      return x
+    })
+    return table
+  },
+  findRowAfterDate: function (dateSer, rangeStrToLookFor) {
+    let row
+    const findSerialDate = Math.round(dateSer);
+    let data = ApiUtils.readRangeSS(SSId, rangeStrToLookFor, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
+    if (data.length) { row = data.findLastIndex(row => row[0] < findSerialDate) };
+    if (row === undefined || row === -1) { row = 0 } else { row++ };
+    return row;
+  },
+  findRowDaysBefore: function (daysBeforeNow = 5, rangeStrToLookFor = "История затрат(api)!A2:A") {
+    let row
+    const findSerialDate = Math.round(this.getSerialNumberDate(new Date())) - daysBeforeNow;
+    let data = ApiUtils.readRangeSS(SSId, rangeStrToLookFor, "UNFORMATTED_VALUE", "SERIAL_NUMBER");
+    if (data.length) { row = data.findLastIndex(row => row[0] < findSerialDate) };
+    if (row === undefined || row === -1) { row = 0 } else { row++ };
+    return row;
+  },
+  convertDate: function (d) { return Utilities.formatDate(d, "GMT+03", "yyyy-MM-dd'T'HH:mm:ss'.000Z'"); },
+  generateContinuousPeriodsFast: function (daysIntoPast, dateToSer) {
+    const maxDaysPeriod = 31 - 1;
+    const dayMs = 86400000; // 1 день в миллисекундах
+    console.log(this.getDateFromSerialNumberDate(dateToSer))
+    let today = dateToSer ? this.getDateFromSerialNumberDate(dateToSer) : Date.now();
+    today = Math.floor(today / dayMs) * dayMs; // Текущая дата без времени
+    const startDate = today - daysIntoPast * dayMs;
+
+    const periods = [];
+    let periodStart = startDate;
+    let periodEnd = periodStart + maxDaysPeriod * dayMs;
+
+    while (periodStart <= today) {
+      periods.push({
+        start: formatDateUTC(periodStart),
+        end: formatDateUTC(Math.min(periodEnd, today)),
+      });
+      periodStart = periodEnd;
+      periodEnd = periodStart + maxDaysPeriod * dayMs;
+    }
+
+    return periods;
+
+    function formatDateUTC(timestamp) {
+      return new Date(timestamp).toISOString().slice(0, 10);
+    }
+  },
+  formatDateTo_dd_MM_yyyy: function (dateStr) { return dateStr.slice(0, 10).split("-").reverse().join(".") },
+  reversDateStToSort: function (dateStr, spliter = ".") {
+    //revers "01.01.2020" or "01-01-2020" to 20200101 for sorting
+    try {
+      return dateStr.split(spliter).reverse().join("");
+    } catch (e) {
+      console.log(e.stack, "на elm: ", dateStr);
+    }
+  },
+};
+const OtherUtils = {
+  getRowIndexDateGteToday: function (data, column, day_before = 0, isDateObj = false) {
+    // возвращает номер строки таблицы data, в колонке column которой дата больше или равна значение Сегодня-day_before
+    // поиск идет с последней строки, если не находит дату возвращает 0
+    let dates_values = data.map((row) => { return DateUtils.date_from_str(row[column]) })
+    const date_gte_value = new Date(new Date(new Date().getTime() - day_before * 864e5).toDateString()).valueOf()
+    const isLargeOrEqual = (element) => element < date_gte_value;
+    const row_index = dates_values.findLastIndex(isLargeOrEqual)
+    // L("getRowIndexDateGteToday: ", row_index)
+    return row_index === -1 ? row_index : row_index + 1
+  },
+  _objToArray_: (a) => a.map(i => Object.values(i)),
+  _objToTitArray_: (a) => a.length ? [Object.keys(a[0])].concat(_objToArray_(a)) : [],
+  _ruDate_: (d) => new Date(d).toString("ru").slice(0, 10),
+  _range_: (n, start, end) => [...Array(n).keys()].slice(start, end),
+  _CSVtoArray_: function (data) {
+    if (data.status != "success") {
+      console.error(data.error);
+      throw new Error('Ошибка при создании отчета!');
+    }
+    data = UrlFetchApp.fetch(data.file)
+    data = data.getContentText()
+    return Utilities.parseCsv(data, ";")
+  },
+  /** загружает CSV или XLSX как таблицу **/
+  getDataFile: function (url) {
+    // console.log( url );
+    let data = UrlFetchApp.fetch(url);
+    if (url.indexOf(".xlsx") > -1) {
+      let file = data.getBlob();
+      let config = {
+        title: "[Google Sheets] " + url,
+        mimeType: MimeType.GOOGLE_SHEETS
+      };
+      file = Drive.Files.insert(config, file);
+      data = SpreadsheetApp.openById(file.getId());
+      data = data.getSheets()[0].getDataRange().getValues();
+      Drive.Files.remove(file.getId())
+    } else {
+      data = data.getContentText();
+      data = Utilities.parseCsv(data, ";");
+    }
+    return data
+  },
+};
+const SysUtils = {
+  pagination: function (arr, perPage) {
+    let start = 0;
+    let pages = [];
+    while (start < arr.length) {
+      pages.push(arr.slice(start, start + perPage));
+      start += perPage;
+    }
+    return pages
+  },
+  checkResponseCode: function (respCode) {
+    if (respCode === 401) {
+      throw new Error(`Ошибка авторизации, проверьте ключ авторизации.`);
+    }
+    if (respCode === 400) {
+      throw new Error(`Ошибка в теле запроса. Code 400`);
+    }
+    if (respCode === 429) {
+      throw new Error(`Превышено допустимое кол-во запросов в единицу времени. Code 429`);
+    }
+    if (respCode >= 500) {
+      throw new Error(`Сервер не откликается. Повторите запрос через некоторое время. Code ${respCode}`);
+    }
+    if (respCode !== 200) {
+      throw new Error(`Сервер вернул ошибку. Code ${respCode}`);
+    }
+    return true
+  }
+};
+function checkAccess_() {
+    const clientScriptId = ScriptApp.getScriptId();
+    if (!accessRights[clientScriptId]) {
+      throw new Error('Access denied to this library function');
+    }
+    return true;
+  }
+function getkey(keyType = "stat") {
+  let keyname = '', msg = ''
+  if (keyType == "rekl") {
+    rangeName = "B2";
+    keyname = "'РЕКЛАМА'"
+  }
+  else if (keyType === "stand") {
+    rangeName = "B3";
+    keyname = "'КОНТЕНТ'"
+  }
+  else if (keyType === "analytics") {
+    rangeName = "B20";
+    keyname = "'АГАЛИТИКА'"
+  }
+  else {
+    rangeName = "B1";
+    keyname = "'СТАТИСТИКА'"
+  };
+  try {
+    key = SS.getSheetByName("Параметры").getRange(rangeName).getValue();
+  } catch (e) {
+    msg = 'Ошибка доступа к ключу: ' + e
+    // SpreadsheetApp.getActiveSpreadsheet().toast(msg, 'Выполнение не возможно', -1);
+    key = ""
+  }
+  if (key == "") {
+    msg = 'Отсутствует ключ доступа: ' + keyname
+    // SpreadsheetApp.getActiveSpreadsheet().toast(msg, 'Выполнение не возможно', -1);
+    inform(SS, [msg, "Ошибка!"])
+  }
+  return key;
 }
+function getLastDataRow(sheet, columnLitera) {
+  try {
+    let lastRow = sheet.getLastRow();
+    let range = 0;
+    if (lastRow > 0) { range = sheet.getRange(columnLitera + lastRow) } else {
+      range = sheet.getRange(columnLitera + 1);
+    }
+    if (range.getValue() !== "") {
+      return lastRow;
+    } else {
+      return range.getNextDataCell(SpreadsheetApp.Direction.UP).getRow();
+    }
+  }
+  catch (e) {
+    console.log(sheet.getName(), " - Col:  ", columnLitera, " - ошибка getLastDataRow: " + e);
+    return NaN
+  }
+}
+function inform(SS, messages = ["content", "header"], toAlert = false, toConsole = true, toToast = true) {
+  try {
+    if (toConsole) { console.info(...messages) }
+    if (toToast) { SS.toast(...messages, 15) }
+    if (toAlert) { SpreadsheetApp.getUi().alert(messages[0]) }
+  } catch (e) { if (e.message !== "Cannot call SpreadsheetApp.showNotification() from this context.") console.log(e.message); }
+}
+function removeRowsOverLimitTrigg(sheetName) {
+  let limitRows, triggerFuncName;
+  if (sheetName) {
+    const SS = SpreadsheetApp.getActive();
+    const ss = SS.getSheetByName(sheetName);
+    switch (sheetName) {
+      case "Аналитика (api)":
+        limitRows = SS.getRange(`Параметры!B8`).getValue();
+        triggerFuncName = "clearAnalyticsRowsTrigg";
+        limitRows = limitRows || 100000;
+        break;
+      case "Заказы (api)":
+        limitRows = SS.getRange(`Параметры!B9`).getValue();
+        triggerFuncName = "clearOrderRowsTrigg";
+        limitRows = limitRows || 130000;
+        break;
+      case "Продажи (api)":
+        limitRows = SS.getRange(`Параметры!B10`).getValue();
+        triggerFuncName = "clearSalesRowsTrigg";
+        limitRows = limitRows || 130000;
+        break;
+    }
+    ScriptApp.getProjectTriggers().forEach((trigger) => {
+      if (trigger.getHandlerFunction() === triggerFuncName) ScriptApp.deleteTrigger(trigger);
+    });
+    try {
+      let lastDataRow = ss.getDataRange().getLastRow();
+      if (lastDataRow / limitRows > 50) {   // было 1.5 для отладки установлено 50
+        throw new Error(
+          `Удаление строк прервано. Проверить количество удаляемых строк(lastDataRow:${lastDataRow}/limitRows:${limitRows}>1.5(${lastDataRow / limitRows
+          }))`
+        );
+      }
+      let deleteRowsQuantity = lastDataRow - limitRows - 1;
+      if (deleteRowsQuantity > 0) {
+        ss.deleteRows(2, deleteRowsQuantity);
+        console.log("Очищено строк:", deleteRowsQuantity);
+        return deleteRowsQuantity;
+      }
+    } catch (err) {
+      console.log("Ошибка при очистке строк:", err);
+    }
+  }
+  return 0;
+}
+function cellsCount(SSId, log = false, bySheets = true) {
+  const options = {
+    includeGridData: false,
+    fields:
+      "sheets/properties/gridProperties/rowCount,sheets/properties/gridProperties/columnCount,sheets/properties/title",
+  };
+  const resp = Sheets.Spreadsheets.get(SSId, options);
+  // console.log(JSON.stringify(resp));
+  let obj = {}
+  const cellsQuantity = resp.sheets.reduce((accum, sheet) => {
+    let cellsQuantity = sheet.properties.gridProperties.columnCount * sheet.properties.gridProperties.rowCount
+    obj[sheet.properties.title] = cellsQuantity
+    // console.log(`${sheet.properties.title}:${cellsQuantity}`)
+    return (
+      accum + cellsQuantity
+    );
+  }, 0);
+  obj = bySheets ? Object.entries(obj).sort((a, b) => b[1] - a[1]) : ""
+  log &&
+    console.log(
+      `Количество ячеек в файле ${SpreadsheetApp.openById(SSId).getName()}: ${cellsQuantity}\n`,
+      obj
+    );
+
+  return cellsQuantity;
+}
+function removeTriggers(handlers) {
+  ScriptApp.getProjectTriggers().forEach(trigger => {
+    let handler = trigger.getHandlerFunction()
+    if (handlers.includes(handler)) {
+      ScriptApp.deleteTrigger(trigger)
+      console.log(`Script "${handler}" removed`);
+    }
+  })
+}
+function clearValues(sheetName) {
+  let SSId = "1p70ytM1RbNfWtbGKTwbDAUtkTOpUw5AR4uWEU8UFQ4o"
+  ranges = ApiUtils.readRangeSS(SSId, "services!A3:B")
+  ranges = ranges.reduce((res, row) => { if (sheetName === row?.[0]) { res.push(row[1]) }; return res }, []);
+
+  const SS = SpreadsheetApp.getActive(); SS.getRangeList(ranges).clearContent();
+  inform(SS, [`Очищены диапазоны ${ranges}`, "Очистка диапазонов"])
+}
+function saveResult_(resultJson, filename) {
+  const folder = DriveApp.getFoldersByName("JSON").next();
+  const dateTime = new Date().toLocaleString("ru")
+  folder.createFile(`${dateTime}${filename}.JSON`, JSON.stringify(resultJson));
+}
+/**
+ * Save and update array data to temp file. Delete file if (!save)
+ * 
+ * @param {array|object} newData - 2D-array with sheet data or object.
+ * @param {string} filename - filename without extension.
+ * @param {bool} save - if true - save new or update exist file.
+ * @param {string} folderName - folder to save file. Folder will be create if not exists.
+ * @return {array}  2D-array concatenated data.
+ */
+function saveAndReadDataToJSON_(newData, filename, save = true, folderName = "tmp") {
+  const folder = createFolderIfNotExist(folderName);;
+  let filesIter = folder.getFilesByName(filename + ".JSON")
+  let dataFromFile = [];
+
+  if (filesIter.hasNext()) {
+    let file = filesIter.next();// обновляем существующий
+    console.log(file.getName());
+    dataFromFile = JSON.parse(file.getBlob().getDataAsString());
+    newData = Array.isArray(newData) ? dataFromFile.concat(newData) : Object.assign(dataFromFile, newData);
+    if (save) { file.setContent(JSON.stringify(newData)) } else { file.setTrashed(true) };
+  } else if (save) {
+    folder.createFile(`${filename}.JSON`, JSON.stringify(newData)); // создаем новый
+  }
+  return newData
+  function createFolderIfNotExist(folderName) {
+    let folder;
+    try { folder = DriveApp.getFoldersByName(folderName).next(); } catch (e) { folder = DriveApp.createFolder(folderName) };
+    return folder
+  }
+}
+function usersTriggerUpdate() {
+  let SSIdService = "1p70ytM1RbNfWtbGKTwbDAUtkTOpUw5AR4uWEU8UFQ4o";
+  let options = ApiUtils.readRangeSS(SSIdService, "services!G3:H");
+  if (options.length) {
+    const SS = SpreadsheetApp.getActive();
+    const SSId = SS.getId();
+    options.forEach(optionsRow => {
+      let msg;
+      const option = JSON.parse(optionsRow[0]);
+      try {
+        if (optionsRow[1] === 'setup') {
+          const { handler, atHour, everyHours } = option;
+          removeTriggers(handler)
+          let newTrigger = ScriptApp.newTrigger(handler).timeBased();
+          if (atHour !== undefined) {
+            newTrigger.everyDays(1).atHour(atHour);
+          } else if (everyHours) {
+            newTrigger.everyHours(everyHours);
+          }
+          newTrigger.create();
+          msg = `Обновление триггера ${handler} завершено.`;
+        } else if (optionsRow[1] === 'remove') {
+          const { handlers } = option;
+          removeTriggers(handlers);
+          msg = `Удаление триггеров ${handlers} завершено.`;
+        } else if (optionsRow[1] === 'setValue') {
+          const { range, value } = option;
+          ApiUtils.writeToSS(SSId, value, range)
+          msg = `Установка параметров в диапазон ${range} завершена.`;
+        }
+      } catch (e) {
+        msg = `Ошибка выполнения команды ${optionsRow[1]}, ${handler || handlers}. options:${option}.`;
+      }
+      inform(SS, [msg, 'Users trigger update']);
+
+    });
+  } else { console.log('Не заданы параметры триггров commServiceData.'); }
+
+}
+function include(filename) { return HtmlService.createHtmlOutputFromFile(filename).getContent(); }
+
+/** auth */
+function checkAccess_() {
+  const webAppUrl = 'https://script.google.com/macros/s/AKfycbzSiS3hK8cRcfKRiCQo2GyiuxbRm3xhbPrXuwQ7NSlujM5Udr-YiC-1bedXP7Ms0ASb/exec';
+  const token = ScriptApp.getOAuthToken();
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + token },
+    muteHttpExceptions: true
+  };
+  const response = UrlFetchApp.fetch(webAppUrl, options);
+  const content = response.getContentText();  //console.log(content); // DEBUG console
+  const code = response.getResponseCode(); // console.log("code:", code); // DEBUG console
+  const needsAuth = [401, 403].includes(code) || isAuthPage_(content);
+  if (needsAuth) {
+    inform(SS, ['Необходимо авторизоваться: Меню->Авторизация'])
+    throw new Error()
+  }
+  let { isAllowed, msg } = JSON.parse(content);
+  if (!isAllowed) {
+    inform(SS, [msg, "Внимание:"])
+    throw new Error('Отсутствует доступ к библиотеке. Обратитесь в техподдержку.')
+  }
+  return isAllowed
+}
+function isAuthPage_(content) { return content.includes('<title>Sign in - Google Accounts</title>') || content.includes('<html>') }
+// ## Проверка oauthScopes[]
+function checkOAuthMenu_() { checkOAuth_((inf = true)); }
+function checkOAuth_(inf = false) {
+  const authInfo = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
+  if (authInfo.getAuthorizationStatus() === ScriptApp.AuthorizationStatus.NOT_REQUIRED) {
+    if (inf) {
+      inform(SS, ["Авторизация не требуется.", "Проверка авторизации."]);
+    }
+    console.log(`Authorized all scopes successfully.`);
+  } else {
+    const scopesGranted = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL).getAuthorizedScopes();
+    console.log(`Authorized scopes: ${scopesGranted} not enough.`);
+    inform(SS, [`Требуется авторизация.`, "Проверка авторизации."]);
+    ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL);
+  }
+}
+function getAuthorizationHtml() {
+  return HtmlService
+    .createTemplateFromFile('authorization') // Файл ДОЛЖЕН быть в проекте библиотеки
+    .evaluate()
+    .getContent();
+}
+function auth() { SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(getAuthorizationHtml()).setHeight(90), 'Авторизация'); }

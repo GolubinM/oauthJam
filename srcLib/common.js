@@ -515,6 +515,13 @@ const SysUtils = {
     return true
   }
 };
+function checkAccess() {
+    const clientScriptId = ScriptApp.getScriptId();
+    if (!accessRights[clientScriptId]) {
+      throw new Error('Access denied to this library function');
+    }
+    return true;
+  }
 function getkey(keyType = "stat") {
   let keyname = '', msg = ''
   if (keyType == "rekl") {
@@ -734,3 +741,4 @@ function usersTriggerUpdate() {
   } else { console.log('Не заданы параметры триггров commServiceData.'); }
 
 }
+function include(filename) { return HtmlService.createHtmlOutputFromFile(filename).getContent(); }

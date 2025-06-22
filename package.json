@@ -4,6 +4,7 @@
   "description": "",
   "main": "main.js",
   "scripts": {
+    "obfuscate": "node obfuscate-and-push.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -11,6 +12,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "javascript-obfuscator": "^4.1.1",
     "@types/google-apps-script": "^1.0.97",
     "typescript": "^5.8.3"
   }

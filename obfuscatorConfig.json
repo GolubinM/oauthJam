@@ -1,0 +1,32 @@
+{
+  "compact": true,
+  "controlFlowFlattening": false,
+  "deadCodeInjection": false,
+  "debugProtection": false,
+  "disableConsoleOutput": false,
+  "identifierNamesGenerator": "mangled",
+  "renameGlobals": false,
+  "reservedNames": [
+    "getProducts",
+    "getAdvStatistic",
+    "getHystorySpentForAdv",
+    "updateHistory",
+    "getAdvCampList",
+    "statKeyWords",
+    "analyticNmIdPeriod",
+    "keyWords",
+    "searchTextsJam",
+    "getClustersToSearchText",
+    "getHeaderDateParams",
+    "getAccount",
+    "getMenu",
+    "getAuthorizationHtml",
+    "auth"
+  ],
+  "reservedStrings": [],
+  "selfDefending": false,
+  "stringArray": true,
+  "stringArrayEncoding": ["base64"],
+  "stringArrayThreshold": 0.7,
+  "unicodeEscapeSequence": false
+}

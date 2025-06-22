@@ -1,12 +1,4 @@
 /** code.gs */
-// DEBUG
-function testHistory() {
-  // SSId = "1fVwPRevZnLnJWWMhIVNMB5j0jAidEDrueVn9khsAWwY";
-  // SS = SpreadsheetApp.openById(SSId);
-  // SpreadsheetApp.setActiveSpreadsheet(SS);
-  // updateHistory();
-  getAdvCampList()
-}
 // снять для отладки
 // let sprs = SpreadsheetApp.openById("1ZOgynpxji02tlWHVTbgNc6soCx_7afF5bKNIjaO-9fw")
 // SpreadsheetApp.setActiveSpreadsheet(sprs)
@@ -94,12 +86,6 @@ function getProducts() {
       muteHttpExceptions: true,
     };
   }
-}
-function testAdv() {
-  SSId = "1fVwPRevZnLnJWWMhIVNMB5j0jAidEDrueVn9khsAWwY";
-  SS = SpreadsheetApp.openById(SSId);
-  SpreadsheetApp.setActiveSpreadsheet(SS);
-  getAdvStatistic();
 }
 /**
  * временно возможный интервал получения статистики сокращен до 31 суток
@@ -1058,6 +1044,7 @@ function keyWords() {
   }
 }
 function searchTextsJam(SP) {
+  checkAccess_()
   removeTriggers(["searchTextsJamTrigg"]);
   let { dateFromSer, dateToSer } = getHeaderDateParams(SheetNames.searchTextsJam);
   const maxRequests = 10;
@@ -1299,6 +1286,7 @@ function searchTextsJam(SP) {
 function getClustersToSearchText() {
   // var url = 'http://45.155.146.48:48263/search/';
   // var url = 'http://81.177.166.230/search/';
+  checkAccess_()
   var url = "https://clusters.1gb.ru/search/";
   let data = ApiUtils.readRangeSS(SSId, `${SheetNames.searchTextsJam}!B5:B`).flat(Infinity);
   let searchValues = [...new Set(data)];

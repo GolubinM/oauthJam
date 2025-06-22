@@ -1,16 +1,9 @@
 {
-  "scriptId": "1WiecZllh25OCRALA-a6OOM-4iPjAl21I3EaqFWsm_qs5-Oay_fJyo5eW",
-  "rootDir": "srcBundle/",
-  "scriptExtensions": [
-    ".js",
-    ".gs"
-  ],
-  "htmlExtensions": [
-    ".html"
-  ],
-  "jsonExtensions": [
-    ".json"
-  ],
+  "scriptId": "1-w0hcWi4hWuEJd-BcxY-x5Zapb_bZfNQ8MrZ41CCmLo8SnnPjH5UugVH",
+  "rootDir": "destBundle/",
+  "scriptExtensions": [".js", ".gs"],
+  "htmlExtensions": [".html"],
+  "jsonExtensions": [".json"],
   "filePushOrder": [],
   "skipSubdirectories": false
 }
